@@ -6,11 +6,14 @@ const SocketContext = createContext();
 export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const connect = () => {
       try {
+        // Log connection attempt
+        console.log('Attempting to connect to Socket.IO server...');
+        
         const socketConnection = io({
           path: '/socket.io/',
           reconnection: true,
@@ -20,38 +23,66 @@ export function SocketProvider({ children }) {
         });
 
         socketConnection.on('connect', () => {
-          console.log('Connected to server');
+          console.log('Successfully connected to Socket.IO server');
           setIsConnected(true);
+          setError(null);
         });
 
         socketConnection.on('disconnect', () => {
-          console.log('Disconnected from server');
+          console.log('Disconnected from Socket.IO server');
           setIsConnected(false);
         });
 
         socketConnection.on('connect_error', (error) => {
-          console.error('Connection error:', error);
-          setConnectionAttempts(prev => prev + 1);
+          console.error('Socket.IO connection error:', error);
+          setError(error.message);
         });
 
         setSocket(socketConnection);
 
-        return () => socketConnection.close();
+        return () => {
+          console.log('Cleaning up socket connection');
+          socketConnection.close();
+        };
       } catch (error) {
         console.error('Socket initialization error:', error);
+        setError(error.message);
       }
     };
 
     connect();
   }, []);
 
-  if (connectionAttempts > 10) {
-    return <div>Unable to connect to server. Please refresh the page.</div>;
+  if (error) {
+    return (
+      <div style={{ 
+        padding: '20px', 
+        margin: '20px', 
+        border: '2px solid red',
+        borderRadius: '8px',
+        backgroundColor: '#fff'
+      }}>
+        <h2>Connection Error</h2>
+        <p>{error}</p>
+        <p>Please check your network connection and refresh the page.</p>
+      </div>
+    );
   }
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>
-      {children}
+      {!isConnected ? (
+        <div style={{ 
+          padding: '20px', 
+          margin: '20px', 
+          border: '2px solid #ccc',
+          borderRadius: '8px',
+          backgroundColor: '#fff'
+        }}>
+          <h2>Connecting to server...</h2>
+          <p>Please wait while we establish connection.</p>
+        </div>
+      ) : children}
     </SocketContext.Provider>
   );
 }
