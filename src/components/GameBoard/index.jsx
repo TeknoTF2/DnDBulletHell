@@ -34,6 +34,40 @@ const GameBoard = () => {
     color: 'red'
   });
 
+  const compressImage = (imageData, maxWidth = 800, maxHeight = 800) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Calculate new dimensions
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Compress to JPEG with quality 0.7
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = imageData;
+    });
+  };
+
   // Initialize connection and local player
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -119,36 +153,47 @@ const GameBoard = () => {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [selectedPlayer, playerPositions, gridConfig, socket, localPlayerId]);
 
-  // Grid config handlers
-  const updateGridConfig = (newConfig) => {
-    setGridConfig(newConfig);
-    if (socket) {
-      socket.emit('updateGridConfig', newConfig);
-    }
-  };
-
   // Image handling functions
-  const handleImageUpload = (e, type, playerId = null) => {
+  const handleImageUpload = async (e, type, playerId = null) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const imageData = event.target.result;
-      
-      if (type === 'background') {
-        setBackgroundImage(imageData);
-        if (socket) {
-          socket.emit('updateBackgroundConfig', {
-            image: imageData,
-            config: backgroundConfig
-          });
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const compressedImage = await compressImage(event.target.result);
+          
+          if (type === 'background') {
+            setBackgroundImage(compressedImage);
+            if (socket) {
+              // Split the image data into chunks
+              const chunkSize = 100 * 1024; // 100KB chunks
+              const chunks = [];
+              for (let i = 0; i < compressedImage.length; i += chunkSize) {
+                chunks.push(compressedImage.slice(i, i + chunkSize));
+              }
+              
+              // Send chunks one by one
+              for (let i = 0; i < chunks.length; i++) {
+                socket.emit('backgroundChunk', {
+                  chunk: chunks[i],
+                  index: i,
+                  total: chunks.length
+                });
+              }
+            }
+          } else if (type === 'token' && playerId === localPlayerId) {
+            socket.emit('updatePlayerToken', { image: compressedImage });
+          }
+        } catch (error) {
+          console.error('Error processing image:', error);
         }
-      } else if (type === 'token' && playerId === localPlayerId) {
-        socket.emit('updatePlayerToken', { image: imageData });
-      }
-    };
-    reader.readAsDataURL(file);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error reading file:', error);
+    }
   };
 
   const removeImage = (type, playerId = null) => {
