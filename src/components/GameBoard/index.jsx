@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Card from '../ui/Card';
+import Card from '../../components/ui/Card';
 import Grid from './Grid';
 import BackgroundSettings from './BackgroundSettings';
 import PlayerControls from './PlayerControls';
