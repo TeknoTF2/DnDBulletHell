@@ -5,7 +5,7 @@ import BackgroundSettings from './BackgroundSettings';
 import PlayerControls from './PlayerControls';
 import AttackPatterns from './AttackPatterns';
 import { useSocket } from '../../context/SocketContext';
-import { CELL_SIZE, INITIAL_BACKGROUND_CONFIG } from './types';
+import { CELL_SIZE, INITIAL_BACKGROUND_CONFIG, GRID_LIMITS } from './types';
 
 const GameBoard = () => {
   const { socket, isConnected } = useSocket();
@@ -33,6 +33,13 @@ const GameBoard = () => {
     name: '',
     color: 'red'
   });
+
+  const updateGridConfig = (newConfig) => {
+    setGridConfig(newConfig);
+    if (socket) {
+      socket.emit('updateGridConfig', newConfig);
+    }
+  };
 
   const compressImage = (imageData, maxWidth = 800, maxHeight = 800) => {
     return new Promise((resolve) => {
@@ -265,12 +272,12 @@ const GameBoard = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Width:</label>
             <input
               type="number"
-              min="5"
-              max="30"
+              min={GRID_LIMITS.min}
+              max={GRID_LIMITS.max}
               value={gridConfig.width}
               onChange={(e) => updateGridConfig({
                 ...gridConfig,
-                width: Math.max(5, Math.min(30, parseInt(e.target.value) || 5))
+                width: Math.max(GRID_LIMITS.min, Math.min(GRID_LIMITS.max, parseInt(e.target.value) || GRID_LIMITS.min))
               })}
               className="border rounded p-2 w-24"
             />
@@ -279,12 +286,12 @@ const GameBoard = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Height:</label>
             <input
               type="number"
-              min="5"
-              max="30"
+              min={GRID_LIMITS.min}
+              max={GRID_LIMITS.max}
               value={gridConfig.height}
               onChange={(e) => updateGridConfig({
                 ...gridConfig,
-                height: Math.max(5, Math.min(30, parseInt(e.target.value) || 5))
+                height: Math.max(GRID_LIMITS.min, Math.min(GRID_LIMITS.max, parseInt(e.target.value) || GRID_LIMITS.min))
               })}
               className="border rounded p-2 w-24"
             />
