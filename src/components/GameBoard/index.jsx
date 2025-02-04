@@ -1,56 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import Card from '../../components/ui/Card';
+import Card from '../ui/Card';
 import Grid from './Grid';
 import BackgroundSettings from './BackgroundSettings';
 import PlayerControls from './PlayerControls';
 import AttackPatterns from './AttackPatterns';
-import { CELL_SIZE, INITIAL_BACKGROUND_CONFIG, PHASE_DELAY } from './types';
+import { useSocket } from '../../context/SocketContext';
+import { CELL_SIZE, INITIAL_BACKGROUND_CONFIG } from './types';
 
 const GameBoard = () => {
+  const { socket, isConnected } = useSocket();
+  
   // Grid configuration
   const [gridConfig, setGridConfig] = useState({
     width: 15,
     height: 15
   });
-  const CELL_SIZE = 40;
   
   // Image states
   const [backgroundImage, setBackgroundImage] = useState(null);
-  const [backgroundConfig, setBackgroundConfig] = useState({
-    size: 'cover',
-    position: 'center',
-    opacity: 1
-  });
+  const [backgroundConfig, setBackgroundConfig] = useState(INITIAL_BACKGROUND_CONFIG);
   
-  // Player state
-  const [playerPositions, setPlayerPositions] = useState([
-    { 
-      id: 'player1', 
-      x: Math.floor(gridConfig.width / 2), 
-      y: Math.floor(gridConfig.height / 2), 
-      color: 'blue',
-      image: null,
-      tokenConfig: {
-        shape: 'circle',
-        size: 'fill',
-        opacity: 1
-      }
-    },
-    { 
-      id: 'player2', 
-      x: Math.floor(gridConfig.width / 2) + 1, 
-      y: Math.floor(gridConfig.height / 2), 
-      color: 'green',
-      image: null,
-      tokenConfig: {
-        shape: 'circle',
-        size: 'fill',
-        opacity: 1
-      }
-    }
-  ]);
-
-  // Attack states
+  // Game state
+  const [playerPositions, setPlayerPositions] = useState([]);
+  const [localPlayerId, setLocalPlayerId] = useState(null);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [attacks, setAttacks] = useState([]);
   const [savedAttacks, setSavedAttacks] = useState([]);
@@ -62,53 +34,80 @@ const GameBoard = () => {
     color: 'red'
   });
 
-  // Reset player positions when grid size changes
+  // Initialize connection and local player
   useEffect(() => {
-    setPlayerPositions(prev => prev.map((player, index) => ({
-      ...player,
-      x: Math.floor(gridConfig.width / 2) + index,
-      y: Math.floor(gridConfig.height / 2)
-    })));
-    setAttacks([]);
-    setCurrentAttack(prev => ({
-      ...prev,
-      pattern: [],
-      phases: [[]]
-    }));
-  }, [gridConfig]);
+    if (!socket || !isConnected) return;
 
-  // Handle player movement with arrow keys
+    // Join the game
+    const initialPosition = {
+      x: Math.floor(gridConfig.width / 2),
+      y: Math.floor(gridConfig.height / 2),
+      color: '#' + Math.floor(Math.random()*16777215).toString(16), // Random color
+      tokenConfig: {
+        shape: 'circle',
+        size: 'fill',
+        opacity: 1
+      }
+    };
+
+    socket.emit('joinGame', initialPosition);
+    setLocalPlayerId(socket.id);
+
+    // Listen for player updates
+    socket.on('playersUpdate', (players) => {
+      setPlayerPositions(players);
+    });
+
+    // Listen for new attacks
+    socket.on('newAttack', (attack) => {
+      setAttacks(prev => [...prev, attack]);
+    });
+
+    // Listen for attack completion
+    socket.on('attackComplete', (attackId) => {
+      setAttacks(prev => prev.filter(a => a.id !== attackId));
+    });
+
+    return () => {
+      socket.off('playersUpdate');
+      socket.off('newAttack');
+      socket.off('attackComplete');
+    };
+  }, [socket, isConnected, gridConfig]);
+
+  // Handle player movement
   useEffect(() => {
     const handleKeyPress = (e) => {
-      if (!selectedPlayer) return;
+      if (!selectedPlayer || !socket || selectedPlayer !== localPlayerId) return;
       
       const player = playerPositions.find(p => p.id === selectedPlayer);
       if (!player) return;
       
-      const newPositions = [...playerPositions];
-      const playerIndex = newPositions.findIndex(p => p.id === selectedPlayer);
+      let newPosition = { x: player.x, y: player.y };
       
       switch(e.key) {
         case 'ArrowUp':
-          if (player.y > 0) newPositions[playerIndex].y--;
+          if (player.y > 0) newPosition.y--;
           break;
         case 'ArrowDown':
-          if (player.y < gridConfig.height - 1) newPositions[playerIndex].y++;
+          if (player.y < gridConfig.height - 1) newPosition.y++;
           break;
         case 'ArrowLeft':
-          if (player.x > 0) newPositions[playerIndex].x--;
+          if (player.x > 0) newPosition.x--;
           break;
         case 'ArrowRight':
-          if (player.x < gridConfig.width - 1) newPositions[playerIndex].x++;
+          if (player.x < gridConfig.width - 1) newPosition.x++;
           break;
+        default:
+          return;
       }
       
-      setPlayerPositions(newPositions);
+      socket.emit('playerMove', newPosition);
     };
     
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [selectedPlayer, playerPositions, gridConfig]);
+  }, [selectedPlayer, playerPositions, gridConfig, socket, localPlayerId]);
 
   // Image handling functions
   const handleImageUpload = (e, type, playerId = null) => {
@@ -121,12 +120,8 @@ const GameBoard = () => {
       
       if (type === 'background') {
         setBackgroundImage(imageData);
-      } else if (type === 'token' && playerId) {
-        setPlayerPositions(prev => prev.map(player => 
-          player.id === playerId 
-            ? { ...player, image: imageData }
-            : player
-        ));
+      } else if (type === 'token' && playerId === localPlayerId) {
+        socket.emit('updatePlayerToken', { image: imageData });
       }
     };
     reader.readAsDataURL(file);
@@ -135,36 +130,14 @@ const GameBoard = () => {
   const removeImage = (type, playerId = null) => {
     if (type === 'background') {
       setBackgroundImage(null);
-    } else if (type === 'token' && playerId) {
-      setPlayerPositions(prev => prev.map(player => 
-        player.id === playerId 
-          ? { ...player, image: null }
-          : player
-      ));
+    } else if (type === 'token' && playerId === localPlayerId) {
+      socket.emit('updatePlayerToken', { image: null });
     }
   };
 
   const updateTokenConfig = (playerId, key, value) => {
-    setPlayerPositions(prev => prev.map(player => 
-      player.id === playerId 
-        ? { 
-            ...player, 
-            tokenConfig: { 
-              ...player.tokenConfig, 
-              [key]: value 
-            }
-          }
-        : player
-    ));
-  };
-
-  // Grid size handler
-  const handleGridSizeChange = (dimension, value) => {
-    const newSize = Math.max(5, Math.min(30, parseInt(value) || 5));
-    setGridConfig(prev => ({
-      ...prev,
-      [dimension]: newSize
-    }));
+    if (playerId !== localPlayerId) return;
+    socket.emit('updatePlayerToken', { tokenConfig: { [key]: value } });
   };
 
   // Attack handlers
@@ -173,11 +146,7 @@ const GameBoard = () => {
     
     const newAttack = {
       ...currentAttack,
-      id: Date.now(),
-      cells: currentAttack.phases.flat().map(cell => ({
-        ...cell,
-        phase: cell.phase || 0
-      }))
+      id: Date.now()
     };
     
     setSavedAttacks(prev => [...prev, newAttack]);
@@ -191,31 +160,21 @@ const GameBoard = () => {
   };
 
   const launchAttack = (attack) => {
-    const maxPhase = Math.max(...attack.cells.map(cell => cell.phase));
-    
-    setAttacks(prev => [...prev, { ...attack, currentPhase: 0 }]);
-
-    for (let phase = 1; phase <= maxPhase; phase++) {
-      setTimeout(() => {
-        setAttacks(prev => 
-          prev.map(a => 
-            a.id === attack.id 
-              ? { ...a, currentPhase: phase }
-              : a
-          )
-        );
-      }, phase * PHASE_DELAY);
-    }
-
-    setTimeout(() => {
-      setAttacks(prev => prev.filter(a => a.id !== attack.id));
-    }, (maxPhase + 1) * PHASE_DELAY);
+    if (!socket) return;
+    socket.emit('launchAttack', attack);
   };
+
+  if (!isConnected) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-xl">Connecting to server...</p>
+      </div>
+    );
+  }
 
   return (
     <Card className="p-6 bg-gray-50">
       <div className="mb-4 space-y-4">
-        {/* Grid size controls */}
         <div className="flex gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Width:</label>
@@ -224,7 +183,10 @@ const GameBoard = () => {
               min="5"
               max="30"
               value={gridConfig.width}
-              onChange={(e) => handleGridSizeChange('width', e.target.value)}
+              onChange={(e) => setGridConfig(prev => ({
+                ...prev,
+                width: Math.max(5, Math.min(30, parseInt(e.target.value) || 5))
+              }))}
               className="border rounded p-2 w-24"
             />
           </div>
@@ -235,7 +197,10 @@ const GameBoard = () => {
               min="5"
               max="30"
               value={gridConfig.height}
-              onChange={(e) => handleGridSizeChange('height', e.target.value)}
+              onChange={(e) => setGridConfig(prev => ({
+                ...prev,
+                height: Math.max(5, Math.min(30, parseInt(e.target.value) || 5))
+              }))}
               className="border rounded p-2 w-24"
             />
           </div>
@@ -258,6 +223,7 @@ const GameBoard = () => {
           playerPositions={playerPositions}
           selectedPlayer={selectedPlayer}
           setSelectedPlayer={setSelectedPlayer}
+          localPlayerId={localPlayerId}
           attacks={attacks}
           currentAttack={currentAttack}
           setCurrentAttack={setCurrentAttack}
@@ -266,6 +232,7 @@ const GameBoard = () => {
         <div className="flex flex-col gap-4">
           <PlayerControls
             playerPositions={playerPositions}
+            localPlayerId={localPlayerId}
             handleImageUpload={handleImageUpload}
             removeImage={removeImage}
             updateTokenConfig={updateTokenConfig}
