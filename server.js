@@ -3,7 +3,7 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const next = require('next');
 
-const port = parseInt(process.env.PORT, 10) || 10000; // Changed to Render's default port
+const port = parseInt(process.env.PORT, 10) || 10000;
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
@@ -31,7 +31,7 @@ app.prepare().then(() => {
   const gameState = {
     players: new Map(),
     activeAttacks: [],
-    backgroundChunks: new Map(), // For storing image chunks
+    backgroundChunks: new Map(),
     boardConfig: {
       grid: {
         width: 15,
@@ -85,7 +85,6 @@ app.prepare().then(() => {
       }
     });
 
-    // New board configuration handlers
     socket.on('updateGridConfig', (config) => {
       gameState.boardConfig.grid = config;
       io.emit('boardConfigUpdate', gameState.boardConfig);
@@ -96,31 +95,20 @@ app.prepare().then(() => {
       io.emit('boardConfigUpdate', gameState.boardConfig);
     });
 
-    // Handle background image chunks
     socket.on('backgroundChunk', (data) => {
       const { chunk, index, total } = data;
       
-      // Initialize array for this socket if not exists
       if (!gameState.backgroundChunks.has(socket.id)) {
         gameState.backgroundChunks.set(socket.id, new Array(total).fill(null));
       }
       
-      // Store this chunk
       const chunks = gameState.backgroundChunks.get(socket.id);
       chunks[index] = chunk;
       
-      // Check if all chunks received
       if (!chunks.includes(null)) {
-        // Combine chunks
         const completeImage = chunks.join('');
-        
-        // Update game state
         gameState.boardConfig.background.image = completeImage;
-        
-        // Broadcast to all clients
         io.emit('boardConfigUpdate', gameState.boardConfig);
-        
-        // Clear chunks
         gameState.backgroundChunks.delete(socket.id);
       }
     });
@@ -129,17 +117,21 @@ app.prepare().then(() => {
       const attackWithId = {
         ...attack,
         id: Date.now(),
+        startTime: Date.now(), // Add start time for timing calculations
         createdBy: socket.id
       };
       gameState.activeAttacks.push(attackWithId);
       io.emit('newAttack', attackWithId);
 
-      // Remove attack after all phases complete
+      // Calculate total duration including warning phase
       const maxPhase = Math.max(...attack.cells.map(cell => cell.phase));
+      const totalDuration = (maxPhase + 1) * 800 + 1500; // 800ms per phase + 1500ms for warning+active
+
+      // Remove attack after all phases and effects complete
       setTimeout(() => {
         gameState.activeAttacks = gameState.activeAttacks.filter(a => a.id !== attackWithId.id);
         io.emit('attackComplete', attackWithId.id);
-      }, (maxPhase + 1) * 800);
+      }, totalDuration);
     });
 
     socket.on('disconnect', () => {
