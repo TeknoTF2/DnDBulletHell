@@ -23,6 +23,29 @@ const AttackPatterns = ({
     }));
   };
 
+  const handleSaveAttack = () => {
+    // Skip if no phases or if all phases are empty
+    if (!currentAttack.phases || currentAttack.phases.every(phase => !phase || phase.length === 0)) {
+      return;
+    }
+
+    // Prepare cells array with proper phase information
+    const cells = currentAttack.phases.flatMap((phase, phaseIndex) => 
+      phase.map(cell => ({
+        ...cell,
+        phase: phaseIndex
+      }))
+    );
+
+    const attackToSave = {
+      ...currentAttack,
+      cells: cells,
+      id: Date.now()
+    };
+
+    saveAttack(attackToSave);
+  };
+
   return (
     <>
       <div className="border rounded p-4">
@@ -31,7 +54,7 @@ const AttackPatterns = ({
           type="text"
           placeholder="Attack name"
           className="border p-2 mb-2 w-full"
-          value={currentAttack.name}
+          value={currentAttack.name || ''}
           onChange={e => setCurrentAttack(prev => ({ ...prev, name: e.target.value }))}
         />
         
@@ -48,7 +71,7 @@ const AttackPatterns = ({
           </div>
           
           <div className="flex gap-2 flex-wrap">
-            {currentAttack.phases.map((phase, index) => (
+            {currentAttack.phases?.map((phase, index) => (
               <button
                 key={index}
                 onClick={() => selectPhase(index)}
@@ -58,7 +81,7 @@ const AttackPatterns = ({
                     : 'bg-gray-100'
                 }`}
               >
-                {index + 1} ({phase.length})
+                {index + 1} ({phase?.length || 0})
               </button>
             ))}
           </div>
@@ -66,7 +89,7 @@ const AttackPatterns = ({
 
         <button
           className="bg-blue-500 text-white px-4 py-2 rounded w-full"
-          onClick={saveAttack}
+          onClick={handleSaveAttack}
         >
           Save Pattern
         </button>
@@ -74,7 +97,7 @@ const AttackPatterns = ({
       
       <div className="border rounded p-4">
         <h3 className="font-bold mb-2">Saved Attacks</h3>
-        {savedAttacks.length === 0 ? (
+        {!savedAttacks || savedAttacks.length === 0 ? (
           <p className="text-gray-500 text-sm">No saved attack patterns yet</p>
         ) : (
           <div className="flex flex-col gap-2">
@@ -83,7 +106,7 @@ const AttackPatterns = ({
                 <span>
                   {attack.name || 'Unnamed Attack'}
                   <span className="text-sm text-gray-500 ml-2">
-                    ({Math.max(...attack.cells.map(c => c.phase)) + 1} phases)
+                    ({attack.cells ? Math.max(...attack.cells.map(c => c.phase)) + 1 : 1} phases)
                   </span>
                 </span>
                 <button
