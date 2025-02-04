@@ -1,4 +1,10 @@
-import GameBoard from '../components/GameBoard';
+import dynamic from 'next/dynamic'
+
+// Import GameBoard with no SSR
+const GameBoard = dynamic(
+  () => import('../components/GameBoard'),
+  { ssr: false }
+)
 
 export default function Home() {
   return (
