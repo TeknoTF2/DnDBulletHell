@@ -3,7 +3,7 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const next = require('next');
 
-const port = parseInt(process.env.PORT, 10) || 3000;
+const port = parseInt(process.env.PORT, 10) || 10000; // Changed to Render's default port
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
@@ -11,11 +11,19 @@ const handle = app.getRequestHandler();
 app.prepare().then(() => {
   const expressApp = express();
   const server = createServer(expressApp);
+  
+  // Add error handling middleware
+  expressApp.use((err, req, res, next) => {
+    console.error('Express error:', err);
+    res.status(500).send('Something broke!');
+  });
+
   const io = new Server(server, {
     cors: {
       origin: "*",
       methods: ["GET", "POST"]
-    }
+    },
+    transports: ['websocket', 'polling'] // Added transport options
   });
 
   // Game state
@@ -27,6 +35,11 @@ app.prepare().then(() => {
   // Socket.io connection handling
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
+    
+    // Add error handler for socket
+    socket.on('error', (error) => {
+      console.error('Socket error for client:', socket.id, error);
+    });
 
     socket.on('joinGame', (playerData) => {
       console.log('Player joined:', socket.id, playerData);
@@ -78,12 +91,20 @@ app.prepare().then(() => {
     });
   });
 
-  // Next.js page handling
+  // Next.js page handling with debug logging
   expressApp.all('*', (req, res) => {
+    console.log(`Request received: ${req.method} ${req.url}`);
     return handle(req, res);
   });
 
-  server.listen(port, () => {
+  server.listen(port, (err) => {
+    if (err) {
+      console.error('Failed to start server:', err);
+      return;
+    }
     console.log(`> Ready on http://localhost:${port}`);
   });
+}).catch((err) => {
+  console.error('Error during app preparation:', err);
+  process.exit(1);
 });
