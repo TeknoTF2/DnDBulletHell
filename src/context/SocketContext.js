@@ -6,29 +6,48 @@ const SocketContext = createContext();
 export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
 
   useEffect(() => {
-    // Connect to the server's WebSocket
-    const socketConnection = io(window.location.origin, {
-      transports: ['websocket']
-    });
+    const connect = () => {
+      try {
+        const socketConnection = io({
+          path: '/socket.io/',
+          reconnection: true,
+          reconnectionAttempts: 10,
+          reconnectionDelay: 1000,
+          transports: ['websocket', 'polling']
+        });
 
-    socketConnection.on('connect', () => {
-      console.log('Connected to server');
-      setIsConnected(true);
-    });
+        socketConnection.on('connect', () => {
+          console.log('Connected to server');
+          setIsConnected(true);
+        });
 
-    socketConnection.on('disconnect', () => {
-      console.log('Disconnected from server');
-      setIsConnected(false);
-    });
+        socketConnection.on('disconnect', () => {
+          console.log('Disconnected from server');
+          setIsConnected(false);
+        });
 
-    setSocket(socketConnection);
+        socketConnection.on('connect_error', (error) => {
+          console.error('Connection error:', error);
+          setConnectionAttempts(prev => prev + 1);
+        });
 
-    return () => {
-      socketConnection.close();
+        setSocket(socketConnection);
+
+        return () => socketConnection.close();
+      } catch (error) {
+        console.error('Socket initialization error:', error);
+      }
     };
+
+    connect();
   }, []);
+
+  if (connectionAttempts > 10) {
+    return <div>Unable to connect to server. Please refresh the page.</div>;
+  }
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>
