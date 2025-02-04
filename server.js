@@ -23,13 +23,15 @@ app.prepare().then(() => {
       origin: "*",
       methods: ["GET", "POST"]
     },
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    maxHttpBufferSize: 1e8 // 100 MB max buffer size
   });
 
-  // Game state with added board configuration
+  // Game state
   const gameState = {
     players: new Map(),
     activeAttacks: [],
+    backgroundChunks: new Map(), // For storing image chunks
     boardConfig: {
       grid: {
         width: 15,
@@ -94,6 +96,35 @@ app.prepare().then(() => {
       io.emit('boardConfigUpdate', gameState.boardConfig);
     });
 
+    // Handle background image chunks
+    socket.on('backgroundChunk', (data) => {
+      const { chunk, index, total } = data;
+      
+      // Initialize array for this socket if not exists
+      if (!gameState.backgroundChunks.has(socket.id)) {
+        gameState.backgroundChunks.set(socket.id, new Array(total).fill(null));
+      }
+      
+      // Store this chunk
+      const chunks = gameState.backgroundChunks.get(socket.id);
+      chunks[index] = chunk;
+      
+      // Check if all chunks received
+      if (!chunks.includes(null)) {
+        // Combine chunks
+        const completeImage = chunks.join('');
+        
+        // Update game state
+        gameState.boardConfig.background.image = completeImage;
+        
+        // Broadcast to all clients
+        io.emit('boardConfigUpdate', gameState.boardConfig);
+        
+        // Clear chunks
+        gameState.backgroundChunks.delete(socket.id);
+      }
+    });
+
     socket.on('launchAttack', (attack) => {
       const attackWithId = {
         ...attack,
@@ -113,6 +144,9 @@ app.prepare().then(() => {
 
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
+      // Clean up any background chunks
+      gameState.backgroundChunks.delete(socket.id);
+      // Remove player
       gameState.players.delete(socket.id);
       io.emit('playersUpdate', Array.from(gameState.players.values()));
     });
