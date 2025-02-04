@@ -13,15 +13,41 @@ const Cell = ({
   setCurrentAttack
 }) => {
   const player = playerPositions.find(p => p.x === x && p.y === y);
-  const isAttack = attacks.some(attack => 
-    attack.cells.some(cell => cell.x === x && cell.y === y && cell.phase === attack.currentPhase)
-  );
-  const isPatternCell = currentAttack.phases[currentAttack.currentPhase].some(p => p.x === x && p.y === y);
+  
+  // Calculate attack state for this cell
+  const getAttackState = () => {
+    for (const attack of attacks) {
+      const cell = attack.cells.find(cell => cell.x === x && cell.y === y);
+      if (!cell) continue;
+
+      const timeSinceStart = Date.now() - attack.startTime;
+      const phaseStartTime = cell.phase * 800; // 800ms per phase
+      const timeInPhase = timeSinceStart - phaseStartTime;
+
+      // If we haven't reached this phase yet, skip
+      if (timeSinceStart < phaseStartTime) continue;
+
+      // Warning phase (first 500ms)
+      if (timeInPhase <= 500) {
+        return 'warning';
+      }
+      // Active phase (next 1000ms)
+      else if (timeInPhase <= 1500) {
+        return 'active';
+      }
+      // After that, no effect
+    }
+    return null;
+  };
+
+  const attackState = getAttackState();
+  const isPatternCell = currentAttack.phases[currentAttack.currentPhase]?.some(p => p.x === x && p.y === y);
   
   return (
     <div
-      className={`border border-gray-300 ${
-        isAttack ? 'bg-red-500/50' :
+      className={`border border-gray-300 transition-colors duration-200 ${
+        attackState === 'warning' ? 'bg-orange-500/50' :
+        attackState === 'active' ? 'bg-red-500/50' :
         isPatternCell ? 'bg-yellow-200/50' :
         'bg-transparent'
       }`}
@@ -34,7 +60,7 @@ const Cell = ({
         // If clicking a player token, don't handle the grid click
         if (e.target !== e.currentTarget) return;
 
-        const isAlreadySelected = currentAttack.phases[currentAttack.currentPhase].some(p => p.x === x && p.y === y);
+        const isAlreadySelected = currentAttack.phases[currentAttack.currentPhase]?.some(p => p.x === x && p.y === y);
         
         setCurrentAttack(prev => ({
           ...prev,
