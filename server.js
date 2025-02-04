@@ -23,13 +23,27 @@ app.prepare().then(() => {
       origin: "*",
       methods: ["GET", "POST"]
     },
-    transports: ['websocket', 'polling'] // Added transport options
+    transports: ['websocket', 'polling']
   });
 
-  // Game state
+  // Game state with added board configuration
   const gameState = {
     players: new Map(),
-    activeAttacks: []
+    activeAttacks: [],
+    boardConfig: {
+      grid: {
+        width: 15,
+        height: 15
+      },
+      background: {
+        image: null,
+        config: {
+          size: 'cover',
+          position: 'center',
+          opacity: 1
+        }
+      }
+    }
   };
 
   // Socket.io connection handling
@@ -48,6 +62,8 @@ app.prepare().then(() => {
         id: socket.id
       });
       io.emit('playersUpdate', Array.from(gameState.players.values()));
+      // Send current board configuration to new player
+      socket.emit('boardConfigUpdate', gameState.boardConfig);
     });
 
     socket.on('playerMove', (position) => {
@@ -65,6 +81,17 @@ app.prepare().then(() => {
         Object.assign(player, tokenData);
         io.emit('playersUpdate', Array.from(gameState.players.values()));
       }
+    });
+
+    // New board configuration handlers
+    socket.on('updateGridConfig', (config) => {
+      gameState.boardConfig.grid = config;
+      io.emit('boardConfigUpdate', gameState.boardConfig);
+    });
+
+    socket.on('updateBackgroundConfig', (config) => {
+      gameState.boardConfig.background = config;
+      io.emit('boardConfigUpdate', gameState.boardConfig);
     });
 
     socket.on('launchAttack', (attack) => {
