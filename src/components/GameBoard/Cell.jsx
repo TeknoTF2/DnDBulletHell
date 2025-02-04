@@ -7,6 +7,7 @@ const Cell = ({
   playerPositions,
   selectedPlayer,
   setSelectedPlayer,
+  localPlayerId,
   attacks,
   currentAttack,
   setCurrentAttack
@@ -49,23 +50,35 @@ const Cell = ({
     >
       {player && (
         <div
-          className={`absolute inset-2 cursor-pointer overflow-hidden ${TOKEN_SHAPES[player.tokenConfig.shape].class}`}
-          style={{ opacity: player.tokenConfig.opacity }}
+          className={`absolute inset-2 cursor-pointer overflow-hidden ${TOKEN_SHAPES[player.tokenConfig?.shape || 'circle'].class}`}
+          style={{ 
+            opacity: player.tokenConfig?.opacity || 1,
+            backgroundColor: player.color,
+            border: player.id === selectedPlayer ? '2px solid white' : 'none',
+            boxShadow: player.id === selectedPlayer ? '0 0 0 2px black' : 'none'
+          }}
           onClick={(e) => {
             e.stopPropagation(); // Prevent grid click
-            setSelectedPlayer(prev => prev === player.id ? null : player.id);
+            if (player.id === localPlayerId) {
+              setSelectedPlayer(prev => prev === player.id ? null : player.id);
+            }
           }}
         >
           {player.image ? (
             <img 
               src={player.image} 
-              alt={player.id}
+              alt={`Player ${player.id}`}
               className={`w-full h-full ${
-                player.tokenConfig.size === 'fill' ? 'object-cover' : 'object-contain'
+                player.tokenConfig?.size === 'fill' ? 'object-cover' : 'object-contain'
               }`}
             />
           ) : (
-            <div className="w-full h-full" style={{ backgroundColor: player.color }} />
+            <div className="w-full h-full" />
+          )}
+          {player.id === localPlayerId && (
+            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs text-center">
+              You
+            </div>
           )}
         </div>
       )}
