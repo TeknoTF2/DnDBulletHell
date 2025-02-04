@@ -9,6 +9,7 @@ const Grid = ({
   playerPositions,
   selectedPlayer,
   setSelectedPlayer,
+  localPlayerId,
   attacks,
   currentAttack,
   setCurrentAttack
@@ -34,6 +35,7 @@ const Grid = ({
             playerPositions={playerPositions}
             selectedPlayer={selectedPlayer}
             setSelectedPlayer={setSelectedPlayer}
+            localPlayerId={localPlayerId}
             attacks={attacks}
             currentAttack={currentAttack}
             setCurrentAttack={setCurrentAttack}
@@ -42,8 +44,10 @@ const Grid = ({
       </div>
       <div className="text-sm text-gray-600">
         {selectedPlayer ? 
-          `Selected: ${selectedPlayer} (Use arrow keys to move)` : 
-          'Click a player token to select it'}
+          selectedPlayer === localPlayerId ?
+            `You are selected (Use arrow keys to move)` :
+            `Watching ${selectedPlayer}'s token` : 
+          'Click your token to move it'}
       </div>
     </div>
   );
