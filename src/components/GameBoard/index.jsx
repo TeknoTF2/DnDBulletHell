@@ -68,12 +68,22 @@ const GameBoard = () => {
       setAttacks(prev => prev.filter(a => a.id !== attackId));
     });
 
+    // Listen for board configuration updates
+    socket.on('boardConfigUpdate', (config) => {
+      setGridConfig(config.grid);
+      if (config.background.image) {
+        setBackgroundImage(config.background.image);
+      }
+      setBackgroundConfig(config.background.config);
+    });
+
     return () => {
       socket.off('playersUpdate');
       socket.off('newAttack');
       socket.off('attackComplete');
+      socket.off('boardConfigUpdate');
     };
-  }, [socket, isConnected, gridConfig]);
+  }, [socket, isConnected]);
 
   // Handle player movement
   useEffect(() => {
@@ -109,6 +119,14 @@ const GameBoard = () => {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [selectedPlayer, playerPositions, gridConfig, socket, localPlayerId]);
 
+  // Grid config handlers
+  const updateGridConfig = (newConfig) => {
+    setGridConfig(newConfig);
+    if (socket) {
+      socket.emit('updateGridConfig', newConfig);
+    }
+  };
+
   // Image handling functions
   const handleImageUpload = (e, type, playerId = null) => {
     const file = e.target.files[0];
@@ -120,6 +138,12 @@ const GameBoard = () => {
       
       if (type === 'background') {
         setBackgroundImage(imageData);
+        if (socket) {
+          socket.emit('updateBackgroundConfig', {
+            image: imageData,
+            config: backgroundConfig
+          });
+        }
       } else if (type === 'token' && playerId === localPlayerId) {
         socket.emit('updatePlayerToken', { image: imageData });
       }
@@ -130,8 +154,24 @@ const GameBoard = () => {
   const removeImage = (type, playerId = null) => {
     if (type === 'background') {
       setBackgroundImage(null);
+      if (socket) {
+        socket.emit('updateBackgroundConfig', {
+          image: null,
+          config: backgroundConfig
+        });
+      }
     } else if (type === 'token' && playerId === localPlayerId) {
       socket.emit('updatePlayerToken', { image: null });
+    }
+  };
+
+  const updateBackgroundConfig = (newConfig) => {
+    setBackgroundConfig(newConfig);
+    if (socket) {
+      socket.emit('updateBackgroundConfig', {
+        image: backgroundImage,
+        config: newConfig
+      });
     }
   };
 
@@ -183,10 +223,10 @@ const GameBoard = () => {
               min="5"
               max="30"
               value={gridConfig.width}
-              onChange={(e) => setGridConfig(prev => ({
-                ...prev,
+              onChange={(e) => updateGridConfig({
+                ...gridConfig,
                 width: Math.max(5, Math.min(30, parseInt(e.target.value) || 5))
-              }))}
+              })}
               className="border rounded p-2 w-24"
             />
           </div>
@@ -197,10 +237,10 @@ const GameBoard = () => {
               min="5"
               max="30"
               value={gridConfig.height}
-              onChange={(e) => setGridConfig(prev => ({
-                ...prev,
+              onChange={(e) => updateGridConfig({
+                ...gridConfig,
                 height: Math.max(5, Math.min(30, parseInt(e.target.value) || 5))
-              }))}
+              })}
               className="border rounded p-2 w-24"
             />
           </div>
@@ -209,7 +249,7 @@ const GameBoard = () => {
         <BackgroundSettings
           backgroundImage={backgroundImage}
           backgroundConfig={backgroundConfig}
-          setBackgroundConfig={setBackgroundConfig}
+          setBackgroundConfig={updateBackgroundConfig}
           handleImageUpload={handleImageUpload}
           removeImage={removeImage}
         />
