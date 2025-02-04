@@ -1,0 +1,27 @@
+{
+  "name": "bullet-hell-dnd",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "next": "^14.0.4",
+    "lucide-react": "^0.263.1",
+    "class-variance-authority": "^0.6.0",
+    "clsx": "^1.2.1",
+    "tailwind-merge": "^1.12.0",
+    "tailwindcss": "^3.3.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.21",
+    "eslint": "^8.38.0",
+    "eslint-config-next": "^13.3.0"
+  }
+}
