@@ -74,24 +74,28 @@ const AttackPatterns = ({
       
       <div className="border rounded p-4">
         <h3 className="font-bold mb-2">Saved Attacks</h3>
-        <div className="flex flex-col gap-2">
-          {savedAttacks.map(attack => (
-            <div key={attack.id} className="flex justify-between items-center">
-              <span>
-                {attack.name || 'Unnamed Attack'}
-                <span className="text-sm text-gray-500 ml-2">
-                  ({Math.max(...attack.cells.map(c => c.phase)) + 1} phases)
+        {savedAttacks.length === 0 ? (
+          <p className="text-gray-500 text-sm">No saved attack patterns yet</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {savedAttacks.map(attack => (
+              <div key={attack.id} className="flex justify-between items-center">
+                <span>
+                  {attack.name || 'Unnamed Attack'}
+                  <span className="text-sm text-gray-500 ml-2">
+                    ({Math.max(...attack.cells.map(c => c.phase)) + 1} phases)
+                  </span>
                 </span>
-              </span>
-              <button
-                className="bg-red-500 text-white px-3 py-1 rounded"
-                onClick={() => launchAttack(attack)}
-              >
-                Launch
-              </button>
-            </div>
-          ))}
-        </div>
+                <button
+                  className="bg-red-500 text-white px-3 py-1 rounded"
+                  onClick={() => launchAttack(attack)}
+                >
+                  Launch
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );
