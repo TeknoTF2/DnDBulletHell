@@ -4,15 +4,15 @@ import { Plus } from 'lucide-react';
 const AttackPatterns = ({
   currentAttack,
   setCurrentAttack,
-  savedAttacks,
+  savedAttacks = [], // Provide default empty array
   saveAttack,
   launchAttack
 }) => {
   const addPhase = () => {
     setCurrentAttack(prev => ({
       ...prev,
-      phases: [...prev.phases, []],
-      currentPhase: prev.phases.length
+      phases: [...(prev.phases || []), []],
+      currentPhase: (prev.phases || []).length
     }));
   };
 
@@ -24,18 +24,26 @@ const AttackPatterns = ({
   };
 
   const handleSaveAttack = () => {
+    // Validate current attack structure
+    if (!currentAttack?.phases || !Array.isArray(currentAttack.phases)) {
+      console.error('Invalid attack structure');
+      return;
+    }
+
     // Skip if no phases or if all phases are empty
-    if (!currentAttack.phases || currentAttack.phases.every(phase => !phase || phase.length === 0)) {
+    if (currentAttack.phases.every(phase => !phase || phase.length === 0)) {
       return;
     }
 
     // Prepare cells array with proper phase information
     const cells = currentAttack.phases.flatMap((phase, phaseIndex) => 
-      phase.map(cell => ({
+      (phase || []).map(cell => ({
         ...cell,
+        x: cell?.x || 0,
+        y: cell?.y || 0,
         phase: phaseIndex
       }))
-    );
+    ).filter(cell => cell.x !== undefined && cell.y !== undefined);
 
     const attackToSave = {
       ...currentAttack,
@@ -46,6 +54,26 @@ const AttackPatterns = ({
     saveAttack(attackToSave);
   };
 
+  const handleLaunchAttack = (attack) => {
+    // Validate attack before launching
+    if (!attack?.cells || !Array.isArray(attack.cells)) {
+      console.error('Invalid attack structure for launch');
+      return;
+    }
+
+    // Make sure all cells have the required properties
+    const validatedAttack = {
+      ...attack,
+      cells: attack.cells.map(cell => ({
+        x: cell?.x || 0,
+        y: cell?.y || 0,
+        phase: cell?.phase || 0
+      }))
+    };
+
+    launchAttack(validatedAttack);
+  };
+
   return (
     <>
       <div className="border rounded p-4">
@@ -54,7 +82,7 @@ const AttackPatterns = ({
           type="text"
           placeholder="Attack name"
           className="border p-2 mb-2 w-full"
-          value={currentAttack.name || ''}
+          value={currentAttack?.name || ''}
           onChange={e => setCurrentAttack(prev => ({ ...prev, name: e.target.value }))}
         />
         
@@ -71,7 +99,7 @@ const AttackPatterns = ({
           </div>
           
           <div className="flex gap-2 flex-wrap">
-            {currentAttack.phases?.map((phase, index) => (
+            {currentAttack?.phases?.map((phase, index) => (
               <button
                 key={index}
                 onClick={() => selectPhase(index)}
@@ -81,7 +109,7 @@ const AttackPatterns = ({
                     : 'bg-gray-100'
                 }`}
               >
-                {index + 1} ({phase?.length || 0})
+                {index + 1} ({(phase || []).length})
               </button>
             ))}
           </div>
@@ -97,7 +125,7 @@ const AttackPatterns = ({
       
       <div className="border rounded p-4">
         <h3 className="font-bold mb-2">Saved Attacks</h3>
-        {!savedAttacks || savedAttacks.length === 0 ? (
+        {!savedAttacks?.length ? (
           <p className="text-gray-500 text-sm">No saved attack patterns yet</p>
         ) : (
           <div className="flex flex-col gap-2">
@@ -106,12 +134,12 @@ const AttackPatterns = ({
                 <span>
                   {attack.name || 'Unnamed Attack'}
                   <span className="text-sm text-gray-500 ml-2">
-                    ({attack.cells ? Math.max(...attack.cells.map(c => c.phase)) + 1 : 1} phases)
+                    ({attack.cells?.length ? Math.max(...attack.cells.map(c => c?.phase || 0)) + 1 : 1} phases)
                   </span>
                 </span>
                 <button
                   className="bg-red-500 text-white px-3 py-1 rounded"
-                  onClick={() => launchAttack(attack)}
+                  onClick={() => handleLaunchAttack(attack)}
                 >
                   Launch
                 </button>
