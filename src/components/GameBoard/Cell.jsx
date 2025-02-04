@@ -8,19 +8,23 @@ const Cell = ({
   selectedPlayer,
   setSelectedPlayer,
   localPlayerId,
-  attacks,
+  attacks = [], // Provide default empty array
   currentAttack,
   setCurrentAttack
 }) => {
-  const player = playerPositions.find(p => p.x === x && p.y === y);
+  const player = playerPositions?.find(p => p.x === x && p.y === y);
   
   // Calculate attack state for this cell
   const getAttackState = () => {
+    if (!Array.isArray(attacks)) return null;
+    
     for (const attack of attacks) {
-      const cell = attack.cells.find(cell => cell.x === x && cell.y === y);
+      if (!attack?.cells || !Array.isArray(attack.cells)) continue;
+      
+      const cell = attack.cells.find(cell => cell?.x === x && cell?.y === y);
       if (!cell) continue;
 
-      const timeSinceStart = Date.now() - attack.startTime;
+      const timeSinceStart = attack.startTime ? Date.now() - attack.startTime : 0;
       const phaseStartTime = cell.phase * 800; // 800ms per phase
       const timeInPhase = timeSinceStart - phaseStartTime;
 
@@ -41,7 +45,7 @@ const Cell = ({
   };
 
   const attackState = getAttackState();
-  const isPatternCell = currentAttack.phases[currentAttack.currentPhase]?.some(p => p.x === x && p.y === y);
+  const isPatternCell = currentAttack?.phases?.[currentAttack.currentPhase]?.some?.(p => p?.x === x && p?.y === y) || false;
   
   return (
     <div
@@ -60,14 +64,16 @@ const Cell = ({
         // If clicking a player token, don't handle the grid click
         if (e.target !== e.currentTarget) return;
 
-        const isAlreadySelected = currentAttack.phases[currentAttack.currentPhase]?.some(p => p.x === x && p.y === y);
+        if (!currentAttack?.phases?.[currentAttack.currentPhase]) return;
+
+        const isAlreadySelected = currentAttack.phases[currentAttack.currentPhase].some(p => p?.x === x && p?.y === y);
         
         setCurrentAttack(prev => ({
           ...prev,
           phases: prev.phases.map((phase, idx) => 
             idx === prev.currentPhase 
               ? isAlreadySelected
-                ? phase.filter(p => !(p.x === x && p.y === y)) // Remove if already selected
+                ? phase.filter(p => !(p?.x === x && p?.y === y)) // Remove if already selected
                 : [...phase, { x, y, phase: prev.currentPhase }] // Add if not selected
               : phase
           )
