@@ -26,13 +26,11 @@ const GameBoard = () => {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [attacks, setAttacks] = useState([]);
   const [savedAttacks, setSavedAttacks] = useState([]);
-  const [currentAttack, setCurrentAttack] = useState({
-    pattern: [],
-    phases: [[]],
-    currentPhase: 0,
-    name: '',
-    color: 'red'
-  });
+ const [currentAttack, setCurrentAttack] = useState({
+  name: '',
+  phases: [[]],
+  currentPhase: 0
+});
 
   const updateGridConfig = (newConfig) => {
     setGridConfig(newConfig);
@@ -265,38 +263,34 @@ useEffect(() => {
   }
 };
 
-  // Attack handlers
-  const saveAttack = () => {
-    if (currentAttack.phases.every(phase => phase.length === 0)) return;
-    
-    const newAttack = {
-      ...currentAttack,
-      id: Date.now()
-    };
-    
-    setSavedAttacks(prev => [...prev, newAttack]);
-    setCurrentAttack({
-      pattern: [],
-      phases: [[]],
-      currentPhase: 0,
-      name: '',
-      color: 'red'
-    });
+ // Attack handlers
+const saveAttack = (attack) => {
+  if (!attack?.cells || attack.cells.length === 0) return;
+  setSavedAttacks(prev => [...prev, attack]);
+};
+
+const launchAttack = (attack) => {
+  if (!socket) return;
+  
+  const validatedAttack = {
+    ...attack,
+    cells: attack.cells.map(cell => ({
+      x: parseInt(cell.x) || 0,
+      y: parseInt(cell.y) || 0,
+      phase: parseInt(cell.phase) || 0
+    }))
   };
+  
+  socket.emit('launchAttack', validatedAttack);
+};
 
-  const launchAttack = (attack) => {
-    if (!socket) return;
-    socket.emit('launchAttack', attack);
-  };
-
-  if (!isConnected) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-xl">Connecting to server...</p>
-      </div>
-    );
-  }
-
+if (!isConnected) {
+  return (
+    <div className="flex items-center justify-center h-screen">
+      <p className="text-xl">Connecting to server...</p>
+    </div>
+  );
+}
   return (
     <Card className="p-6 bg-gray-50">
       <div className="mb-4 space-y-4">
