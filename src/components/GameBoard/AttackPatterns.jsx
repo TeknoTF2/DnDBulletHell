@@ -53,6 +53,13 @@ const AttackPatterns = ({
     };
 
     saveAttack(attackToSave);
+
+    // Reset the current attack
+    setCurrentAttack({
+      name: '',
+      phases: [[]],
+      currentPhase: 0
+    });
   };
 
   const handleLaunchAttack = (attack) => {
@@ -117,14 +124,14 @@ const AttackPatterns = ({
         </div>
 
         <button
-          className="bg-blue-500 text-white px-4 py-2 rounded w-full"
+          className="bg-blue-500 text-white px-4 py-2 rounded w-full hover:bg-blue-600"
           onClick={handleSaveAttack}
         >
           Save Pattern
         </button>
       </div>
       
-      <div className="border rounded p-4">
+      <div className="border rounded p-4 mt-4">
         <h3 className="font-bold mb-2">Saved Attacks</h3>
         {!savedAttacks?.length ? (
           <p className="text-gray-500 text-sm">No saved attack patterns yet</p>
@@ -139,7 +146,7 @@ const AttackPatterns = ({
                   </span>
                 </span>
                 <button
-                  className="bg-red-500 text-white px-3 py-1 rounded"
+                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
                   onClick={() => handleLaunchAttack(attack)}
                 >
                   Launch
