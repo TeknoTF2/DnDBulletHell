@@ -57,6 +57,59 @@ app.prepare().then(() => {
       console.error('Socket error for client:', socket.id, error);
     });
 
+    Put it after gameState but before the io.on('connection') part. The order should be:
+
+io server setup
+gameState definition
+setInterval cooldown checker
+io.on('connection') handlers
+
+So like this:
+javascriptCopyconst io = new Server(server, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    },
+    transports: ['websocket', 'polling'],
+    maxHttpBufferSize: 1e8 // 100 MB max buffer size
+});
+
+// Game state
+const gameState = {
+    players: new Map(),
+    activeAttacks: [],
+    backgroundChunks: new Map(),
+    boardConfig: {
+      grid: {
+        width: 15,
+        height: 15
+      },
+      background: {
+        image: null,
+        config: {
+          size: 'cover',
+          position: 'center',
+          opacity: 1
+        }
+      }
+    }
+};
+
+// Add periodic check for cooldown expiry
+setInterval(() => {
+  for (const [socketId, player] of gameState.players.entries()) {
+    if (player.movementCooldown) {
+      const now = Date.now();
+      const timeSinceCooldown = now - player.movementCooldown;
+      if (timeSinceCooldown >= 6000) {
+        player.movementPoints = player.speed;
+        player.movementCooldown = null;
+        io.emit('playersUpdate', Array.from(gameState.players.values()));
+      }
+    }
+  }
+}, 100); // Check every 100ms
+
    socket.on('joinGame', (playerData) => {
   console.log('Player joined:', socket.id, playerData);
   gameState.players.set(socket.id, {
