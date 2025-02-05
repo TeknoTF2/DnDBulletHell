@@ -21,25 +21,28 @@ const Cell = ({
     for (const attack of attacks) {
       if (!attack?.cells || !Array.isArray(attack.cells)) continue;
       
-      const cell = attack.cells.find(cell => cell?.x === x && cell?.y === y);
-      if (!cell) continue;
+      const cellsInCurrentPhase = attack.cells.filter(cell => 
+        cell?.x === x && 
+        cell?.y === y
+      );
 
-      const timeSinceStart = attack.startTime ? Date.now() - attack.startTime : 0;
-      const phaseStartTime = cell.phase * 800; // 800ms per phase
-      const timeInPhase = timeSinceStart - phaseStartTime;
+      for (const cell of cellsInCurrentPhase) {
+        const timeSinceStart = Date.now() - (attack.startTime || 0);
+        const phaseStartTime = cell.phase * 800; // 800ms per phase
+        const timeInPhase = timeSinceStart - phaseStartTime;
 
-      // If we haven't reached this phase yet, skip
-      if (timeSinceStart < phaseStartTime) continue;
+        // If we haven't reached this phase yet, continue to next cell
+        if (timeSinceStart < phaseStartTime) continue;
 
-      // Warning phase (first 500ms)
-      if (timeInPhase <= 500) {
-        return 'warning';
+        // Warning phase (first 500ms)
+        if (timeInPhase <= 500) {
+          return 'warning';
+        }
+        // Active phase (next 1000ms)
+        else if (timeInPhase <= 1500) {
+          return 'active';
+        }
       }
-      // Active phase (next 1000ms)
-      else if (timeInPhase <= 1500) {
-        return 'active';
-      }
-      // After that, no effect
     }
     return null;
   };
