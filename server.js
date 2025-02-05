@@ -74,35 +74,23 @@ socket.on('playerMove', (position) => {
   const player = gameState.players.get(socket.id);
   if (!player) return;
 
-  console.log('Move requested:', {
-    player: {
-      speed: player.speed,
-      cooldown: player.movementCooldown,
-      movementPoints: player.movementPoints
-    },
-    position
-  });
-
   // Check cooldown period
   const now = Date.now();
   const timeSinceCooldown = player.movementCooldown ? now - player.movementCooldown : 6000;
   
+  // If 6 seconds have passed since last movement, reset points
   if (timeSinceCooldown >= 6000) {
-    // Reset movement points after cooldown expires
+    console.log('Resetting movement points due to cooldown expired');
     player.movementPoints = player.speed;
     player.movementCooldown = null;
+    // Emit update to ensure client sees the reset
+    io.emit('playersUpdate', Array.from(gameState.players.values()));
   }
 
   // Calculate distance for this move
   const dx = Math.abs(position.x - player.x);
   const dy = Math.abs(position.y - player.y);
   const distance = Math.sqrt(dx * dx + dy * dy);
-
-  console.log('Movement calculation:', {
-    distance,
-    movementPoints: player.movementPoints,
-    allowed: distance <= player.movementPoints
-  });
 
   // Check if player has enough movement points
   if (distance <= player.movementPoints) {
@@ -126,7 +114,6 @@ socket.on('playerMove', (position) => {
     console.log('Movement prevented - not enough points');
   }
 });
-
     socket.on('updatePlayerToken', (tokenData) => {
       const player = gameState.players.get(socket.id);
       if (!player) return;
