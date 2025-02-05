@@ -102,7 +102,7 @@ const PlayerControls = ({
                     {Math.round((player.tokenConfig?.opacity || 1) * 100)}%
                   </span>
                 </div>
-                
+
                 <div className="col-span-2">
                   <div className="flex items-center gap-2 mb-1">
                     <label className="text-sm">Movement Speed:</label>
@@ -121,12 +121,12 @@ const PlayerControls = ({
                     <span className="text-sm text-gray-600">squares/6s</span>
                   </div>
                   
-                  {player.movementCooldown && (
+                  {player.movementCooldown && Date.now() - player.movementCooldown < 6000 && (
                     <div className="w-full h-2 bg-gray-200 rounded overflow-hidden">
                       <div
                         className="h-full bg-blue-500 transition-all duration-100"
                         style={{
-                          width: `${((6000 - (Date.now() - player.movementCooldown)) / 6000) * 100}%`
+                          width: `${Math.max(0, Math.min(100, ((6000 - (Date.now() - player.movementCooldown)) / 6000) * 100))}%`
                         }}
                       />
                     </div>
