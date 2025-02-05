@@ -110,10 +110,10 @@ const PlayerControls = ({
                       type="number"
                       min="1"
                       max="10"
-                      value={player.speed || 3}
+                      value={player.tokenConfig?.speed || 3}
                       onChange={(e) => updateTokenConfig(
                         player.id,
-                        player.speed,
+                        'speed',
                         Math.max(1, Math.min(10, parseInt(e.target.value) || 1))
                       )}
                       className="border rounded p-1 w-16 text-sm"
