@@ -264,10 +264,13 @@ useEffect(() => {
   }
 };
 
- // Attack handlers
+// Attack handlers
 const saveAttack = (attack) => {
   if (!attack?.cells || attack.cells.length === 0) return;
-  setSavedAttacks(prev => [...prev, attack]);
+  setSavedAttacks(prev => [...prev, {
+    ...attack,
+    color: attack.color || 'red' // Ensure color is preserved
+  }]);
 };
 
 const launchAttack = (attack) => {
@@ -275,6 +278,7 @@ const launchAttack = (attack) => {
   
   const validatedAttack = {
     ...attack,
+    color: attack.color || 'red', // Ensure color is preserved
     cells: attack.cells.map(cell => ({
       x: parseInt(cell.x) || 0,
       y: parseInt(cell.y) || 0,
