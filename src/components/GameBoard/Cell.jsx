@@ -8,7 +8,7 @@ const Cell = ({
   selectedPlayer,
   setSelectedPlayer,
   localPlayerId,
-  attacks = [], // Provide default empty array
+  attacks = [],
   currentAttack,
   setCurrentAttack
 }) => {
@@ -21,17 +21,16 @@ const Cell = ({
     for (const attack of attacks) {
       if (!attack?.cells || !Array.isArray(attack.cells)) continue;
       
-      const cellsInCurrentPhase = attack.cells.filter(cell => 
-        cell?.x === x && 
-        cell?.y === y
+      const matchingCells = attack.cells.filter(cell => 
+        cell?.x === x && cell?.y === y
       );
 
-      for (const cell of cellsInCurrentPhase) {
-        const timeSinceStart = Date.now() - (attack.startTime || 0);
-        const phaseStartTime = cell.phase * 800; // 800ms per phase
+      for (const cell of matchingCells) {
+        const timeSinceStart = Date.now() - attack.startTime;
+        const phaseStartTime = (cell.phase || 0) * 800;
         const timeInPhase = timeSinceStart - phaseStartTime;
 
-        // If we haven't reached this phase yet, continue to next cell
+        // If we haven't reached this phase yet
         if (timeSinceStart < phaseStartTime) continue;
 
         // Warning phase (first 500ms)
@@ -77,7 +76,7 @@ const Cell = ({
             idx === prev.currentPhase 
               ? isAlreadySelected
                 ? phase.filter(p => !(p?.x === x && p?.y === y)) // Remove if already selected
-                : [...phase, { x, y, phase: prev.currentPhase }] // Add if not selected
+                : [...phase, { x, y }] // Add if not selected
               : phase
           )
         }));
