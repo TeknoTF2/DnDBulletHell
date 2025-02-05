@@ -180,41 +180,44 @@ socket.on('playerMove', (position) => {
       }
     });
 
-    socket.on('launchAttack', (attack) => {
-      // Validate attack data
-      if (!attack?.cells || !Array.isArray(attack.cells)) {
-        console.error('Invalid attack data received');
-        return;
-      }
+  socket.on('launchAttack', (attack) => {
+  // Validate attack data
+  if (!attack?.cells || !Array.isArray(attack.cells)) {
+    console.error('Invalid attack data received');
+    return;
+  }
 
-      const attackWithId = {
-        ...attack,
-        id: Date.now(),
-        startTime: Date.now(),
-        createdBy: socket.id
-      };
+  // Ensure all cells have required properties
+  const validatedCells = attack.cells.map(cell => ({
+    x: parseInt(cell.x) || 0,
+    y: parseInt(cell.y) || 0,
+    phase: parseInt(cell.phase) || 0
+  }));
 
-      gameState.activeAttacks.push(attackWithId);
-      io.emit('newAttack', attackWithId);
+  const attackWithId = {
+    ...attack,
+    id: Date.now(),
+    startTime: Date.now(),
+    createdBy: socket.id,
+    cells: validatedCells
+  };
 
-      // Calculate total duration including warning phase
-      const maxPhase = Math.max(...attack.cells.map(cell => cell.phase || 0));
-      const totalDuration = (maxPhase + 1) * 800 + 1500; // 800ms per phase + 1500ms for warning+active
+  // Add to active attacks
+  gameState.activeAttacks.push(attackWithId);
+  
+  // Broadcast to all clients
+  io.emit('newAttack', attackWithId);
 
-      // Remove attack after all phases complete
-      setTimeout(() => {
-        gameState.activeAttacks = gameState.activeAttacks.filter(a => a.id !== attackWithId.id);
-        io.emit('attackComplete', attackWithId.id);
-      }, totalDuration);
-    });
+  // Calculate total duration including all phases
+  const maxPhase = Math.max(...validatedCells.map(cell => cell.phase));
+  const totalDuration = (maxPhase + 1) * 800 + 1500; // 800ms per phase + 1500ms for warning+active
 
-    socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id);
-      gameState.backgroundChunks.delete(socket.id);
-      gameState.players.delete(socket.id);
-      io.emit('playersUpdate', Array.from(gameState.players.values()));
-    });
-  });
+  // Remove attack after completion
+  setTimeout(() => {
+    gameState.activeAttacks = gameState.activeAttacks.filter(a => a.id !== attackWithId.id);
+    io.emit('attackComplete', attackWithId.id);
+  }, totalDuration);
+});
 
   // Next.js page handling
   expressApp.all('*', (req, res) => {
