@@ -248,10 +248,22 @@ useEffect(() => {
     }
   };
 
-  const updateTokenConfig = (playerId, key, value) => {
-    if (playerId !== localPlayerId) return;
-    socket.emit('updatePlayerToken', { tokenConfig: { [key]: value } });
-  };
+ const updateTokenConfig = (playerId, key, value) => {
+  if (playerId !== localPlayerId || !socket) return;
+  
+  console.log('Updating token config:', { key, value });
+  
+  if (key === 'speed') {
+    socket.emit('updatePlayerToken', { speed: value });
+  } else {
+    socket.emit('updatePlayerToken', { 
+      tokenConfig: { 
+        ...playerPositions.find(p => p.id === playerId)?.tokenConfig,
+        [key]: value 
+      } 
+    });
+  }
+};
 
   // Attack handlers
   const saveAttack = () => {
