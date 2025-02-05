@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react';
 const AttackPatterns = ({
   currentAttack,
   setCurrentAttack,
-  savedAttacks = [], // Provide default empty array
+  savedAttacks = [],
   saveAttack,
   launchAttack
 }) => {
@@ -35,26 +35,26 @@ const AttackPatterns = ({
       return;
     }
 
-    // Prepare cells array with proper phase information
+    // Convert phases into the cell format the server expects
     const cells = currentAttack.phases.flatMap((phase, phaseIndex) => 
       (phase || []).map(cell => ({
-        x: cell?.x || 0,
-        y: cell?.y || 0,
+        x: cell.x,
+        y: cell.y,
         phase: phaseIndex
       }))
-    ).filter(cell => cell.x !== undefined && cell.y !== undefined);
+    );
 
-    // Create attack object with all necessary data
+    // Create attack object
     const attackToSave = {
       id: Date.now(),
       name: currentAttack.name || `Attack ${Date.now()}`,
-      cells: cells,
-      phases: currentAttack.phases // Keep the original phase structure
+      cells: cells
     };
 
+    // Save the attack
     saveAttack(attackToSave);
 
-    // Reset the current attack
+    // Reset current attack
     setCurrentAttack({
       name: '',
       phases: [[]],
@@ -142,7 +142,7 @@ const AttackPatterns = ({
                 <span>
                   {attack.name || 'Unnamed Attack'}
                   <span className="text-sm text-gray-500 ml-2">
-                    ({attack.cells?.length ? Math.max(...attack.cells.map(c => c?.phase || 0)) + 1 : 1} phases)
+                    ({attack.cells?.length || 0} cells)
                   </span>
                 </span>
                 <button
