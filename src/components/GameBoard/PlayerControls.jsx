@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ImageIcon, X } from 'lucide-react';
 import { TOKEN_SHAPES } from './types';
 
@@ -7,9 +7,15 @@ const PlayerControls = ({
   localPlayerId,
   handleImageUpload,
   removeImage,
-  updateTokenConfig,
-  movementCooldown,
+  updateTokenConfig
 }) => {
+  // Force a rerender every 100ms to update the cooldown bar
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 100);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="border rounded p-4">
       <h3 className="font-bold mb-2">Players</h3>
@@ -103,7 +109,7 @@ const PlayerControls = ({
                     {Math.round((player.tokenConfig?.opacity || 1) * 100)}%
                   </span>
                 </div>
-
+                
                 <div className="col-span-2">
                   <div className="flex items-center gap-2 mb-1">
                     <label className="text-sm">Movement Speed:</label>
@@ -111,12 +117,15 @@ const PlayerControls = ({
                       type="number"
                       min="1"
                       max="10"
-                      value={player.tokenConfig?.speed || 3}
-                      onChange={(e) => updateTokenConfig(
-                        player.id,
-                        'speed',
-                        Math.max(1, Math.min(10, parseInt(e.target.value) || 1))
-                      )}
+                      value={player.speed || 3}
+                      onChange={(e) => {
+                        console.log('Speed change attempted:', e.target.value);
+                        updateTokenConfig(
+                          player.id,
+                          'speed',
+                          Math.max(1, Math.min(10, parseInt(e.target.value) || 1))
+                        );
+                      }}
                       className="border rounded p-1 w-16 text-sm"
                     />
                     <span className="text-sm text-gray-600">squares/6s</span>
