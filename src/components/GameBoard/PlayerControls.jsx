@@ -102,6 +102,36 @@ const PlayerControls = ({
                     {Math.round((player.tokenConfig?.opacity || 1) * 100)}%
                   </span>
                 </div>
+                
+                <div className="col-span-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <label className="text-sm">Movement Speed:</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={player.speed || 3}
+                      onChange={(e) => updateTokenConfig(
+                        player.id,
+                        'speed',
+                        Math.max(1, Math.min(10, parseInt(e.target.value) || 1))
+                      )}
+                      className="border rounded p-1 w-16 text-sm"
+                    />
+                    <span className="text-sm text-gray-600">squares/6s</span>
+                  </div>
+                  
+                  {player.movementCooldown && (
+                    <div className="w-full h-2 bg-gray-200 rounded overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 transition-all duration-100"
+                        style={{
+                          width: `${((6000 - (Date.now() - player.movementCooldown)) / 6000) * 100}%`
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
