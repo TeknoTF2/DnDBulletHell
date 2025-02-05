@@ -26,10 +26,11 @@ const GameBoard = () => {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [attacks, setAttacks] = useState([]);
   const [savedAttacks, setSavedAttacks] = useState([]);
- const [currentAttack, setCurrentAttack] = useState({
+const [currentAttack, setCurrentAttack] = useState({
   name: '',
   phases: [[]],
-  currentPhase: 0
+  currentPhase: 0,
+  color: 'red'  // Keep this for attack visualization
 });
 
   const updateGridConfig = (newConfig) => {
