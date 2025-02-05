@@ -18,17 +18,17 @@ app.prepare().then(() => {
     res.status(500).send('Something broke!');
   });
 
- const io = new Server(server, {
+  const io = new Server(server, {
     cors: {
       origin: "*",
       methods: ["GET", "POST"]
     },
     transports: ['websocket', 'polling'],
     maxHttpBufferSize: 1e8 // 100 MB max buffer size
-});
+  });
 
-// Game state
-const gameState = {
+  // Game state
+  const gameState = {
     players: new Map(),
     activeAttacks: [],
     backgroundChunks: new Map(),
@@ -46,25 +46,25 @@ const gameState = {
         }
       }
     }
-};
+  };
 
-// Add periodic check for cooldown expiry
-setInterval(() => {
-  for (const [socketId, player] of gameState.players.entries()) {
-    if (player.movementCooldown) {
-      const now = Date.now();
-      const timeSinceCooldown = now - player.movementCooldown;
-      if (timeSinceCooldown >= 6000) {
-        player.movementPoints = player.speed;
-        player.movementCooldown = null;
-        io.emit('playersUpdate', Array.from(gameState.players.values()));
+  // Add periodic check for cooldown expiry
+  setInterval(() => {
+    for (const [socketId, player] of gameState.players.entries()) {
+      if (player.movementCooldown) {
+        const now = Date.now();
+        const timeSinceCooldown = now - player.movementCooldown;
+        if (timeSinceCooldown >= 6000) {
+          player.movementPoints = player.speed;
+          player.movementCooldown = null;
+          io.emit('playersUpdate', Array.from(gameState.players.values()));
+        }
       }
     }
-  }
-}, 100); // Check every 100ms
+  }, 100); // Check every 100ms
 
-// Socket.io connection handling
-io.on('connection', (socket) => {
+  // Socket.io connection handling
+  io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
     
     // Add error handler for socket
@@ -72,63 +72,64 @@ io.on('connection', (socket) => {
       console.error('Socket error for client:', socket.id, error);
     });
 
-   socket.on('joinGame', (playerData) => {
-  console.log('Player joined:', socket.id, playerData);
-  gameState.players.set(socket.id, {
-    ...playerData,
-    id: socket.id,
-    speed: playerData.speed || 3, // Default movement speed
-    movementCooldown: null,
-    movementPoints: playerData.speed || 3 // Initialize movement points
-  });
-  io.emit('playersUpdate', Array.from(gameState.players.values()));
-  socket.emit('boardConfigUpdate', gameState.boardConfig);
-});
-
-socket.on('playerMove', (position) => {
-  const player = gameState.players.get(socket.id);
-  if (!player) return;
-
-  // Check cooldown period
-  const now = Date.now();
-  const timeSinceCooldown = player.movementCooldown ? now - player.movementCooldown : 6000;
-  
-  // If 6 seconds have passed since last movement, reset points
-  if (timeSinceCooldown >= 6000) {
-    console.log('Resetting movement points due to cooldown expired');
-    player.movementPoints = player.speed;
-    player.movementCooldown = null;
-    // Emit update to ensure client sees the reset
-    io.emit('playersUpdate', Array.from(gameState.players.values()));
-  }
-
-  // Calculate distance for this move
-  const dx = Math.abs(position.x - player.x);
-  const dy = Math.abs(position.y - player.y);
-  const distance = Math.sqrt(dx * dx + dy * dy);
-
-  // Check if player has enough movement points
-  if (distance <= player.movementPoints) {
-    // Update position
-    player.x = position.x;
-    player.y = position.y;
-    
-    // Deduct movement points
-    player.movementPoints -= distance;
-    
-    // Start/update cooldown timer on ANY movement
-    player.movementCooldown = now;
-    
-    console.log('Movement successful:', {
-      remainingPoints: player.movementPoints,
-      cooldown: player.movementCooldown
+    socket.on('joinGame', (playerData) => {
+      console.log('Player joined:', socket.id, playerData);
+      gameState.players.set(socket.id, {
+        ...playerData,
+        id: socket.id,
+        speed: playerData.speed || 3, // Default movement speed
+        movementCooldown: null,
+        movementPoints: playerData.speed || 3 // Initialize movement points
+      });
+      io.emit('playersUpdate', Array.from(gameState.players.values()));
+      socket.emit('boardConfigUpdate', gameState.boardConfig);
     });
-    
-    io.emit('playersUpdate', Array.from(gameState.players.values()));
-  } else {
-    console.log('Movement prevented - not enough points');
-  }
-});
+
+    socket.on('playerMove', (position) => {
+      const player = gameState.players.get(socket.id);
+      if (!player) return;
+
+      // Check cooldown period
+      const now = Date.now();
+      const timeSinceCooldown = player.movementCooldown ? now - player.movementCooldown : 6000;
+      
+      // If 6 seconds have passed since last movement, reset points
+      if (timeSinceCooldown >= 6000) {
+        console.log('Resetting movement points due to cooldown expired');
+        player.movementPoints = player.speed;
+        player.movementCooldown = null;
+        // Emit update to ensure client sees the reset
+        io.emit('playersUpdate', Array.from(gameState.players.values()));
+      }
+
+      // Calculate distance for this move
+      const dx = Math.abs(position.x - player.x);
+      const dy = Math.abs(position.y - player.y);
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Check if player has enough movement points
+      if (distance <= player.movementPoints) {
+        // Update position
+        player.x = position.x;
+        player.y = position.y;
+        
+        // Deduct movement points
+        player.movementPoints -= distance;
+        
+        // Start/update cooldown timer on ANY movement
+        player.movementCooldown = now;
+        
+        console.log('Movement successful:', {
+          remainingPoints: player.movementPoints,
+          cooldown: player.movementCooldown
+        });
+        
+        io.emit('playersUpdate', Array.from(gameState.players.values()));
+      } else {
+        console.log('Movement prevented - not enough points');
+      }
+    });
+
     socket.on('updatePlayerToken', (tokenData) => {
       const player = gameState.players.get(socket.id);
       if (!player) return;
@@ -180,44 +181,49 @@ socket.on('playerMove', (position) => {
       }
     });
 
-  socket.on('launchAttack', (attack) => {
-  // Validate attack data
-  if (!attack?.cells || !Array.isArray(attack.cells)) {
-    console.error('Invalid attack data received');
-    return;
-  }
+    socket.on('launchAttack', (attack) => {
+      // Validate attack data
+      if (!attack?.cells || !Array.isArray(attack.cells)) {
+        console.error('Invalid attack data received');
+        return;
+      }
 
-  // Ensure all cells have required properties
-  const validatedCells = attack.cells.map(cell => ({
-    x: parseInt(cell.x) || 0,
-    y: parseInt(cell.y) || 0,
-    phase: parseInt(cell.phase) || 0
-  }));
+      // Ensure all cells have required properties
+      const validatedCells = attack.cells.map(cell => ({
+        x: parseInt(cell.x) || 0,
+        y: parseInt(cell.y) || 0,
+        phase: parseInt(cell.phase) || 0
+      }));
 
-  const attackWithId = {
-    ...attack,
-    id: Date.now(),
-    startTime: Date.now(),
-    createdBy: socket.id,
-    cells: validatedCells
-  };
+      const attackWithId = {
+        ...attack,
+        id: Date.now(),
+        startTime: Date.now(),
+        createdBy: socket.id,
+        cells: validatedCells
+      };
 
-  // Add to active attacks
-  gameState.activeAttacks.push(attackWithId);
-  
-  // Broadcast to all clients
-  io.emit('newAttack', attackWithId);
+      gameState.activeAttacks.push(attackWithId);
+      io.emit('newAttack', attackWithId);
 
-  // Calculate total duration including all phases
-  const maxPhase = Math.max(...validatedCells.map(cell => cell.phase));
-  const totalDuration = (maxPhase + 1) * 800 + 1500; // 800ms per phase + 1500ms for warning+active
+      // Calculate total duration including all phases
+      const maxPhase = Math.max(...validatedCells.map(cell => cell.phase));
+      const totalDuration = (maxPhase + 1) * 800 + 1500; // 800ms per phase + 1500ms for warning+active
 
-  // Remove attack after completion
-  setTimeout(() => {
-    gameState.activeAttacks = gameState.activeAttacks.filter(a => a.id !== attackWithId.id);
-    io.emit('attackComplete', attackWithId.id);
-  }, totalDuration);
-});
+      // Remove attack after completion
+      setTimeout(() => {
+        gameState.activeAttacks = gameState.activeAttacks.filter(a => a.id !== attackWithId.id);
+        io.emit('attackComplete', attackWithId.id);
+      }, totalDuration);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Client disconnected:', socket.id);
+      gameState.backgroundChunks.delete(socket.id);
+      gameState.players.delete(socket.id);
+      io.emit('playersUpdate', Array.from(gameState.players.values()));
+    });
+  });
 
   // Next.js page handling
   expressApp.all('*', (req, res) => {
