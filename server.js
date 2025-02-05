@@ -61,28 +61,75 @@ app.prepare().then(() => {
       console.log('Player joined:', socket.id, playerData);
       gameState.players.set(socket.id, {
         ...playerData,
-        id: socket.id
+        id: socket.id,
+        speed: playerData.speed || 3, // Default movement speed
+        movementCooldown: null,
+        lastPosition: { x: playerData.x, y: playerData.y },
+        movementPoints: playerData.speed || 3 // Initialize movement points
       });
       io.emit('playersUpdate', Array.from(gameState.players.values()));
-      // Send current board configuration to new player
       socket.emit('boardConfigUpdate', gameState.boardConfig);
     });
 
     socket.on('playerMove', (position) => {
       const player = gameState.players.get(socket.id);
-      if (player) {
+      if (!player) return;
+
+      // Check cooldown
+      const now = Date.now();
+      const timeSinceCooldown = player.movementCooldown ? now - player.movementCooldown : 6000;
+      
+      if (timeSinceCooldown >= 6000) {
+        // Reset movement points after cooldown
+        player.movementPoints = player.speed;
+        player.movementCooldown = null;
+      }
+
+      // Calculate distance for this move
+      const dx = Math.abs(position.x - player.x);
+      const dy = Math.abs(position.y - player.y);
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Check if player has enough movement points
+      if (distance <= player.movementPoints) {
+        // Update position
         player.x = position.x;
         player.y = position.y;
+        
+        // Deduct movement points
+        player.movementPoints -= distance;
+        
+        // If all movement points are used, start cooldown
+        if (player.movementPoints <= 0) {
+          player.movementCooldown = now;
+          player.movementPoints = 0;
+        }
+        
         io.emit('playersUpdate', Array.from(gameState.players.values()));
       }
     });
 
     socket.on('updatePlayerToken', (tokenData) => {
       const player = gameState.players.get(socket.id);
-      if (player) {
-        Object.assign(player, tokenData);
-        io.emit('playersUpdate', Array.from(gameState.players.values()));
+      if (!player) return;
+
+      // Handle speed updates
+      if (tokenData.speed !== undefined) {
+        const newSpeed = Math.max(1, Math.min(10, parseInt(tokenData.speed) || 3));
+        player.speed = newSpeed;
+        // Reset movement points if speed changes
+        if (!player.movementCooldown) {
+          player.movementPoints = newSpeed;
+        }
       }
+
+      // Update other token properties
+      Object.assign(player, {
+        ...tokenData,
+        speed: player.speed // Preserve the validated speed value
+      });
+
+      io.emit('playersUpdate', Array.from(gameState.players.values()));
     });
 
     socket.on('updateGridConfig', (config) => {
@@ -114,20 +161,27 @@ app.prepare().then(() => {
     });
 
     socket.on('launchAttack', (attack) => {
+      // Validate attack data
+      if (!attack?.cells || !Array.isArray(attack.cells)) {
+        console.error('Invalid attack data received');
+        return;
+      }
+
       const attackWithId = {
         ...attack,
         id: Date.now(),
-        startTime: Date.now(), // Add start time for timing calculations
+        startTime: Date.now(),
         createdBy: socket.id
       };
+
       gameState.activeAttacks.push(attackWithId);
       io.emit('newAttack', attackWithId);
 
       // Calculate total duration including warning phase
-      const maxPhase = Math.max(...attack.cells.map(cell => cell.phase));
+      const maxPhase = Math.max(...attack.cells.map(cell => cell.phase || 0));
       const totalDuration = (maxPhase + 1) * 800 + 1500; // 800ms per phase + 1500ms for warning+active
 
-      // Remove attack after all phases and effects complete
+      // Remove attack after all phases complete
       setTimeout(() => {
         gameState.activeAttacks = gameState.activeAttacks.filter(a => a.id !== attackWithId.id);
         io.emit('attackComplete', attackWithId.id);
@@ -136,17 +190,14 @@ app.prepare().then(() => {
 
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
-      // Clean up any background chunks
       gameState.backgroundChunks.delete(socket.id);
-      // Remove player
       gameState.players.delete(socket.id);
       io.emit('playersUpdate', Array.from(gameState.players.values()));
     });
   });
 
-  // Next.js page handling with debug logging
+  // Next.js page handling
   expressApp.all('*', (req, res) => {
-    console.log(`Request received: ${req.method} ${req.url}`);
     return handle(req, res);
   });
 
