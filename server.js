@@ -57,19 +57,18 @@ app.prepare().then(() => {
       console.error('Socket error for client:', socket.id, error);
     });
 
-    socket.on('joinGame', (playerData) => {
-      console.log('Player joined:', socket.id, playerData);
-      gameState.players.set(socket.id, {
-        ...playerData,
-        id: socket.id,
-        speed: playerData.speed || 3, // Default movement speed
-        movementCooldown: null,
-        lastPosition: { x: playerData.x, y: playerData.y },
-        movementPoints: playerData.speed || 3 // Initialize movement points
-      });
-      io.emit('playersUpdate', Array.from(gameState.players.values()));
-      socket.emit('boardConfigUpdate', gameState.boardConfig);
-    });
+   socket.on('joinGame', (playerData) => {
+  console.log('Player joined:', socket.id, playerData);
+  gameState.players.set(socket.id, {
+    ...playerData,
+    id: socket.id,
+    speed: playerData.speed || 3, // Default movement speed
+    movementCooldown: null,
+    movementPoints: playerData.speed || 3 // Initialize movement points
+  });
+  io.emit('playersUpdate', Array.from(gameState.players.values()));
+  socket.emit('boardConfigUpdate', gameState.boardConfig);
+});
 
 socket.on('playerMove', (position) => {
   const player = gameState.players.get(socket.id);
