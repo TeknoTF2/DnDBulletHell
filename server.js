@@ -18,14 +18,14 @@ app.prepare().then(() => {
     res.status(500).send('Something broke!');
   });
 
-  const io = new Server(server, {
+ const io = new Server(server, {
     cors: {
       origin: "*",
       methods: ["GET", "POST"]
     },
     transports: ['websocket', 'polling'],
     maxHttpBufferSize: 1e8 // 100 MB max buffer size
-  });
+});
 
 // Game state
 const gameState = {
@@ -62,6 +62,15 @@ setInterval(() => {
     }
   }
 }, 100); // Check every 100ms
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+    
+    // Add error handler for socket
+    socket.on('error', (error) => {
+      console.error('Socket error for client:', socket.id, error);
+    });
 
    socket.on('joinGame', (playerData) => {
   console.log('Player joined:', socket.id, playerData);
