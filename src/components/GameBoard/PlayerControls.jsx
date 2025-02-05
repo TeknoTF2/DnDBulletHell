@@ -7,7 +7,8 @@ const PlayerControls = ({
   localPlayerId,
   handleImageUpload,
   removeImage,
-  updateTokenConfig
+  updateTokenConfig,
+  movementCooldown,
 }) => {
   return (
     <div className="border rounded p-4">
