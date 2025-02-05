@@ -38,17 +38,18 @@ const AttackPatterns = ({
     // Prepare cells array with proper phase information
     const cells = currentAttack.phases.flatMap((phase, phaseIndex) => 
       (phase || []).map(cell => ({
-        ...cell,
         x: cell?.x || 0,
         y: cell?.y || 0,
         phase: phaseIndex
       }))
     ).filter(cell => cell.x !== undefined && cell.y !== undefined);
 
+    // Create attack object with all necessary data
     const attackToSave = {
-      ...currentAttack,
+      id: Date.now(),
+      name: currentAttack.name || `Attack ${Date.now()}`,
       cells: cells,
-      id: Date.now()
+      phases: currentAttack.phases // Keep the original phase structure
     };
 
     saveAttack(attackToSave);
