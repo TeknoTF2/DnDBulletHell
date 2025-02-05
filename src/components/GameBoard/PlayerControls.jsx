@@ -9,10 +9,15 @@ const PlayerControls = ({
   removeImage,
   updateTokenConfig
 }) => {
-  // Force a rerender every 100ms to update the cooldown bar
-  const [, setTick] = useState(0);
+  // Add state to force rerenders for the cooldown bar
+  const [, setForceUpdate] = useState(0);
+
+  // Set up interval to update cooldown bar
   useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 100);
+    const interval = setInterval(() => {
+      setForceUpdate(prev => prev + 1);
+    }, 50); // Update every 50ms for smooth animation
+
     return () => clearInterval(interval);
   }, []);
 
@@ -22,6 +27,11 @@ const PlayerControls = ({
       {playerPositions.map(player => {
         const isLocalPlayer = player.id === localPlayerId;
         
+        // Calculate cooldown progress
+        const cooldownProgress = player.movementCooldown 
+          ? Math.max(0, Math.min(100, ((6000 - (Date.now() - player.movementCooldown)) / 6000) * 100))
+          : 0;
+
         return (
           <div key={player.id} className="border-b last:border-0 py-2">
             <div className="flex items-center gap-2 mb-2">
@@ -109,7 +119,7 @@ const PlayerControls = ({
                     {Math.round((player.tokenConfig?.opacity || 1) * 100)}%
                   </span>
                 </div>
-                
+
                 <div className="col-span-2">
                   <div className="flex items-center gap-2 mb-1">
                     <label className="text-sm">Movement Speed:</label>
@@ -119,7 +129,6 @@ const PlayerControls = ({
                       max="10"
                       value={player.speed || 3}
                       onChange={(e) => {
-                        console.log('Speed change attempted:', e.target.value);
                         updateTokenConfig(
                           player.id,
                           'speed',
@@ -130,17 +139,23 @@ const PlayerControls = ({
                     />
                     <span className="text-sm text-gray-600">squares/6s</span>
                   </div>
-                  
-                  {player.movementCooldown && Date.now() - player.movementCooldown < 6000 && (
+
+                  {/* Show cooldown bar if there's an active cooldown */}
+                  {cooldownProgress > 0 && (
                     <div className="w-full h-2 bg-gray-200 rounded overflow-hidden">
                       <div
-                        className="h-full bg-blue-500 transition-all duration-100"
+                        className="h-full bg-blue-500 transition-all duration-50"
                         style={{
-                          width: `${Math.max(0, Math.min(100, ((6000 - (Date.now() - player.movementCooldown)) / 6000) * 100))}%`
+                          width: `${cooldownProgress}%`
                         }}
                       />
                     </div>
                   )}
+                  
+                  {/* Show remaining movement points */}
+                  <div className="text-sm text-gray-600 mt-1">
+                    Movement points: {player.movementPoints?.toFixed(1) || 0} / {player.speed || 3}
+                  </div>
                 </div>
               </div>
             )}
