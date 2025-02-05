@@ -126,39 +126,60 @@ const GameBoard = () => {
     };
   }, [socket, isConnected]);
 
-  // Handle player movement
-  useEffect(() => {
-    const handleKeyPress = (e) => {
-      if (!selectedPlayer || !socket || selectedPlayer !== localPlayerId) return;
-      
-      const player = playerPositions.find(p => p.id === selectedPlayer);
-      if (!player) return;
-      
-      let newPosition = { x: player.x, y: player.y };
-      
-      switch(e.key) {
-        case 'ArrowUp':
-          if (player.y > 0) newPosition.y--;
-          break;
-        case 'ArrowDown':
-          if (player.y < gridConfig.height - 1) newPosition.y++;
-          break;
-        case 'ArrowLeft':
-          if (player.x > 0) newPosition.x--;
-          break;
-        case 'ArrowRight':
-          if (player.x < gridConfig.width - 1) newPosition.x++;
-          break;
-        default:
-          return;
-      }
-      
-      socket.emit('playerMove', newPosition);
-    };
+ // Handle player movement
+useEffect(() => {
+  const handleKeyPress = (e) => {
+    if (!selectedPlayer || !socket || selectedPlayer !== localPlayerId) return;
     
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [selectedPlayer, playerPositions, gridConfig, socket, localPlayerId]);
+    const player = playerPositions.find(p => p.id === selectedPlayer);
+    if (!player) return;
+
+    // Check if movement is on cooldown
+    if (player.movementCooldown && Date.now() - player.movementCooldown < 6000) {
+      // Could add a visual/audio feedback here that movement is on cooldown
+      return;
+    }
+    
+    let newPosition = { x: player.x, y: player.y };
+    let moved = false;
+    
+    switch(e.key) {
+      case 'ArrowUp':
+        if (player.y > 0) {
+          newPosition.y--;
+          moved = true;
+        }
+        break;
+      case 'ArrowDown':
+        if (player.y < gridConfig.height - 1) {
+          newPosition.y++;
+          moved = true;
+        }
+        break;
+      case 'ArrowLeft':
+        if (player.x > 0) {
+          newPosition.x--;
+          moved = true;
+        }
+        break;
+      case 'ArrowRight':
+        if (player.x < gridConfig.width - 1) {
+          newPosition.x++;
+          moved = true;
+        }
+        break;
+      default:
+        return;
+    }
+    
+    if (moved) {
+      socket.emit('playerMove', newPosition);
+    }
+  };
+  
+  window.addEventListener('keydown', handleKeyPress);
+  return () => window.removeEventListener('keydown', handleKeyPress);
+}, [selectedPlayer, playerPositions, gridConfig, socket, localPlayerId]);
 
   // Image handling functions
   const handleImageUpload = async (e, type, playerId = null) => {
