@@ -93,10 +93,19 @@ const [currentAttack, setCurrentAttack] = useState({
     socket.emit('joinGame', initialPosition);
     setLocalPlayerId(socket.id);
 
-    // Listen for player updates
-    socket.on('playersUpdate', (players) => {
-      setPlayerPositions(players);
-    });
+   // Listen for player updates
+useEffect(() => {
+  if (!socket) return;
+  
+  socket.on('playersUpdate', (players) => {
+    console.log('Received players update:', players);
+    setPlayerPositions(players);
+  });
+
+  return () => {
+    socket.off('playersUpdate');
+  };
+}, [socket]);
 
     // Listen for new attacks
     socket.on('newAttack', (attack) => {
