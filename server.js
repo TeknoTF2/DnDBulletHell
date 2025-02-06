@@ -88,6 +88,7 @@ app.prepare().then(() => {
 socket.on('playerMove', (position) => {
   const player = gameState.players.get(socket.id);
   if (!player) return;
+  
   console.log('Move requested by', socket.id, {
     current: { x: player.x, y: player.y },
     requested: position,
@@ -104,7 +105,12 @@ socket.on('playerMove', (position) => {
     console.log('Resetting movement points for player', socket.id);
     player.movementPoints = player.speed;
     player.movementCooldown = null;
-    io.emit('playersUpdate', Array.from(gameState.players.values()));
+    // Ensure we send the update after resetting
+    io.emit('playersUpdate', Array.from(gameState.players.values()).map(p => ({
+      ...p,
+      movementCooldown: p.movementCooldown,
+      movementPoints: p.movementPoints
+    })));
   }
 
   // Calculate distance for this move
@@ -121,7 +127,7 @@ socket.on('playerMove', (position) => {
     // Deduct movement points
     player.movementPoints -= distance;
     
-    // Start/update cooldown timer on ANY movement
+    // Start/update cooldown timer
     player.movementCooldown = now;
     
     console.log('Movement processed:', {
@@ -130,7 +136,12 @@ socket.on('playerMove', (position) => {
       cooldown: player.movementCooldown
     });
     
-    io.emit('playersUpdate', Array.from(gameState.players.values()));
+    // Make sure we're sending ALL the player data including cooldown and points
+    io.emit('playersUpdate', Array.from(gameState.players.values()).map(p => ({
+      ...p,
+      movementCooldown: p.movementCooldown,
+      movementPoints: p.movementPoints
+    })));
   } else {
     console.log('Movement prevented:', {
       playerId: socket.id,
@@ -141,7 +152,6 @@ socket.on('playerMove', (position) => {
     });
   }
 });
-
     socket.on('updatePlayerToken', (tokenData) => {
       const player = gameState.players.get(socket.id);
       if (!player) return;
