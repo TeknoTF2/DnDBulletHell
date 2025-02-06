@@ -85,10 +85,9 @@ app.prepare().then(() => {
       socket.emit('boardConfigUpdate', gameState.boardConfig);
     });
 
-  socket.on('playerMove', (position) => {
+socket.on('playerMove', (position) => {
   const player = gameState.players.get(socket.id);
   if (!player) return;
-
   console.log('Move requested by', socket.id, {
     current: { x: player.x, y: player.y },
     requested: position,
@@ -113,9 +112,8 @@ app.prepare().then(() => {
   const dy = Math.abs(position.y - player.y);
   const distance = Math.sqrt(dx * dx + dy * dy);
 
-  // Check if player has enough movement points and isn't on strict cooldown
-  if (distance <= player.movementPoints && 
-      (!player.movementCooldown || timeSinceCooldown >= 6000)) {
+  // Check if player has enough movement points
+  if (distance <= player.movementPoints) {
     // Update position
     player.x = position.x;
     player.y = position.y;
@@ -123,7 +121,7 @@ app.prepare().then(() => {
     // Deduct movement points
     player.movementPoints -= distance;
     
-    // Start/update cooldown timer
+    // Start/update cooldown timer on ANY movement
     player.movementCooldown = now;
     
     console.log('Movement processed:', {
