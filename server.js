@@ -32,6 +32,7 @@ app.prepare().then(() => {
     players: new Map(),
     activeAttacks: [],
     backgroundChunks: new Map(),
+    savedAttacks: [], // Added this to store saved attacks
     boardConfig: {
       grid: {
         width: 15,
@@ -79,79 +80,81 @@ app.prepare().then(() => {
         id: socket.id,
         speed: playerData.speed || 3, // Default movement speed
         movementCooldown: null,
-        movementPoints: playerData.speed || 3 // Initialize movement points
+        movementPoints: playerData.speed || 3, // Initialize movement points
+        hitCount: 0 // Initialize hit counter
       });
       io.emit('playersUpdate', Array.from(gameState.players.values()));
       socket.emit('boardConfigUpdate', gameState.boardConfig);
     });
 
-socket.on('playerMove', (position) => {
-  const player = gameState.players.get(socket.id);
-  if (!player) return;
-  
-  console.log('Move requested by', socket.id, {
-    current: { x: player.x, y: player.y },
-    requested: position,
-    points: player.movementPoints,
-    cooldown: player.movementCooldown
-  });
+    socket.on('playerMove', (position) => {
+      const player = gameState.players.get(socket.id);
+      if (!player) return;
+      
+      console.log('Move requested by', socket.id, {
+        current: { x: player.x, y: player.y },
+        requested: position,
+        points: player.movementPoints,
+        cooldown: player.movementCooldown
+      });
 
-  // Check cooldown period
-  const now = Date.now();
-  const timeSinceCooldown = player.movementCooldown ? now - player.movementCooldown : 6000;
-  
-  // If 6 seconds have passed since last movement, reset points
-  if (timeSinceCooldown >= 6000) {
-    console.log('Resetting movement points for player', socket.id);
-    player.movementPoints = player.speed;
-    player.movementCooldown = null;
-    // Ensure we send the update after resetting
-    io.emit('playersUpdate', Array.from(gameState.players.values()).map(p => ({
-      ...p,
-      movementCooldown: p.movementCooldown,
-      movementPoints: p.movementPoints
-    })));
-  }
+      // Check cooldown period
+      const now = Date.now();
+      const timeSinceCooldown = player.movementCooldown ? now - player.movementCooldown : 6000;
+      
+      // If 6 seconds have passed since last movement, reset points
+      if (timeSinceCooldown >= 6000) {
+        console.log('Resetting movement points for player', socket.id);
+        player.movementPoints = player.speed;
+        player.movementCooldown = null;
+        // Ensure we send the update after resetting
+        io.emit('playersUpdate', Array.from(gameState.players.values()).map(p => ({
+          ...p,
+          movementCooldown: p.movementCooldown,
+          movementPoints: p.movementPoints
+        })));
+      }
 
-  // Calculate distance for this move
-  const dx = Math.abs(position.x - player.x);
-  const dy = Math.abs(position.y - player.y);
-  const distance = Math.sqrt(dx * dx + dy * dy);
+      // Calculate distance for this move
+      const dx = Math.abs(position.x - player.x);
+      const dy = Math.abs(position.y - player.y);
+      const distance = Math.sqrt(dx * dx + dy * dy);
 
-  // Check if player has enough movement points
-  if (distance <= player.movementPoints) {
-    // Update position
-    player.x = position.x;
-    player.y = position.y;
-    
-    // Deduct movement points
-    player.movementPoints -= distance;
-    
-    // Start/update cooldown timer
-    player.movementCooldown = now;
-    
-    console.log('Movement processed:', {
-      playerId: socket.id,
-      remainingPoints: player.movementPoints,
-      cooldown: player.movementCooldown
+      // Check if player has enough movement points
+      if (distance <= player.movementPoints) {
+        // Update position
+        player.x = position.x;
+        player.y = position.y;
+        
+        // Deduct movement points
+        player.movementPoints -= distance;
+        
+        // Start/update cooldown timer
+        player.movementCooldown = now;
+        
+        console.log('Movement processed:', {
+          playerId: socket.id,
+          remainingPoints: player.movementPoints,
+          cooldown: player.movementCooldown
+        });
+        
+        // Make sure we're sending ALL the player data including cooldown and points
+        io.emit('playersUpdate', Array.from(gameState.players.values()).map(p => ({
+          ...p,
+          movementCooldown: p.movementCooldown,
+          movementPoints: p.movementPoints
+        })));
+      } else {
+        console.log('Movement prevented:', {
+          playerId: socket.id,
+          reason: distance > player.movementPoints ? 'insufficient points' : 'on cooldown',
+          distance,
+          points: player.movementPoints,
+          timeSinceCooldown
+        });
+      }
     });
-    
-    // Make sure we're sending ALL the player data including cooldown and points
-    io.emit('playersUpdate', Array.from(gameState.players.values()).map(p => ({
-      ...p,
-      movementCooldown: p.movementCooldown,
-      movementPoints: p.movementPoints
-    })));
-  } else {
-    console.log('Movement prevented:', {
-      playerId: socket.id,
-      reason: distance > player.movementPoints ? 'insufficient points' : 'on cooldown',
-      distance,
-      points: player.movementPoints,
-      timeSinceCooldown
-    });
-  }
-});
+
     socket.on('updatePlayerToken', (tokenData) => {
       const player = gameState.players.get(socket.id);
       if (!player) return;
@@ -203,7 +206,48 @@ socket.on('playerMove', (position) => {
       }
     });
 
+    // NEW: Add these handlers for attack management
+
+    // Handler for saving attacks
+    socket.on('saveAttack', (attack) => {
+      console.log('Saving attack pattern:', attack);
+      
+      // Simple validation
+      if (!attack || !attack.cells || !Array.isArray(attack.cells) || attack.cells.length === 0) {
+        console.error('Invalid attack data received');
+        return;
+      }
+      
+      // Make sure cells have required properties
+      const validatedCells = attack.cells.map(cell => ({
+        x: parseInt(cell.x) || 0,
+        y: parseInt(cell.y) || 0,
+        phase: parseInt(cell.phase) || 0
+      }));
+      
+      const attackWithId = {
+        ...attack,
+        id: attack.id || Date.now(),
+        createdBy: socket.id,
+        cells: validatedCells
+      };
+
+      // Store in gameState
+      gameState.savedAttacks.push(attackWithId);
+      
+      // Broadcast saved attacks to all clients
+      io.emit('savedAttacksUpdate', gameState.savedAttacks);
+    });
+
+    // Handler for getting saved attacks
+    socket.on('getSavedAttacks', () => {
+      socket.emit('savedAttacksUpdate', gameState.savedAttacks);
+    });
+
+    // Updated launchAttack handler
     socket.on('launchAttack', (attack) => {
+      console.log('Launching attack:', attack);
+      
       // Validate attack data
       if (!attack?.cells || !Array.isArray(attack.cells)) {
         console.error('Invalid attack data received');
@@ -225,7 +269,10 @@ socket.on('playerMove', (position) => {
         cells: validatedCells
       };
 
+      // Add to active attacks
       gameState.activeAttacks.push(attackWithId);
+      
+      // Send to all clients
       io.emit('newAttack', attackWithId);
 
       // Calculate total duration including all phases
@@ -237,6 +284,28 @@ socket.on('playerMove', (position) => {
         gameState.activeAttacks = gameState.activeAttacks.filter(a => a.id !== attackWithId.id);
         io.emit('attackComplete', attackWithId.id);
       }, totalDuration);
+    });
+
+    // Add handler for player hits
+    socket.on('playerHit', (data) => {
+      if (!data.playerId) return;
+      
+      const player = gameState.players.get(data.playerId);
+      if (!player) return;
+      
+      // Initialize hitCount if it doesn't exist
+      if (!player.hitCount) player.hitCount = 0;
+      
+      // Increment hit count
+      player.hitCount++;
+      
+      console.log(`Player ${data.playerId} hit! Count: ${player.hitCount}`);
+      
+      // Broadcast to all clients
+      io.emit('playerHit', { 
+        playerId: data.playerId, 
+        hitCount: player.hitCount 
+      });
     });
 
     socket.on('disconnect', () => {
