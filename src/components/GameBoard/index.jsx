@@ -26,12 +26,12 @@ const GameBoard = () => {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [attacks, setAttacks] = useState([]);
   const [savedAttacks, setSavedAttacks] = useState([]);
-const [currentAttack, setCurrentAttack] = useState({
-  name: '',
-  phases: [[]],
-  currentPhase: 0,
-  color: 'red'  // Keep this for attack visualization
-});
+  const [hitTracker, setHitTracker] = useState({}); // Track hits to prevent duplicates
+  const [currentAttack, setCurrentAttack] = useState({
+    name: '',
+    phases: [[]],
+    currentPhase: 0,
+  });
 
   const updateGridConfig = (newConfig) => {
     setGridConfig(newConfig);
@@ -87,7 +87,8 @@ const [currentAttack, setCurrentAttack] = useState({
         shape: 'circle',
         size: 'fill',
         opacity: 1
-      }
+      },
+      hitCount: 0 // Initialize hit count
     };
 
     socket.emit('joinGame', initialPosition);
@@ -100,12 +101,32 @@ const [currentAttack, setCurrentAttack] = useState({
 
     // Listen for new attacks
     socket.on('newAttack', (attack) => {
+      console.log('Received new attack:', attack);
       setAttacks(prev => [...prev, attack]);
     });
 
     // Listen for attack completion
     socket.on('attackComplete', (attackId) => {
+      console.log('Attack completed:', attackId);
       setAttacks(prev => prev.filter(a => a.id !== attackId));
+    });
+
+    // Listen for player hits
+    socket.on('playerHit', (data) => {
+      console.log('Player hit:', data);
+      setPlayerPositions(prev => 
+        prev.map(player => 
+          player.id === data.playerId 
+            ? { ...player, hitCount: data.hitCount } 
+            : player
+        )
+      );
+    });
+
+    // Listen for saved attacks updates
+    socket.on('savedAttacksUpdate', (attacks) => {
+      console.log('Received saved attacks:', attacks);
+      setSavedAttacks(attacks);
     });
 
     // Listen for board configuration updates
@@ -117,68 +138,73 @@ const [currentAttack, setCurrentAttack] = useState({
       setBackgroundConfig(config.background.config);
     });
 
+    // Request current saved attacks on connection
+    socket.emit('getSavedAttacks');
+
     return () => {
       socket.off('playersUpdate');
       socket.off('newAttack');
       socket.off('attackComplete');
+      socket.off('playerHit');
+      socket.off('savedAttacksUpdate');
       socket.off('boardConfigUpdate');
     };
   }, [socket, isConnected]);
 
- // Handle player movement
-useEffect(() => {
-  const handleKeyPress = (e) => {
-    if (!selectedPlayer || !socket || selectedPlayer !== localPlayerId) return;
-    
-    const player = playerPositions.find(p => p.id === selectedPlayer);
-    if (!player) return;
+  // Handle player movement
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (!selectedPlayer || !socket || selectedPlayer !== localPlayerId) return;
+      
+      const player = playerPositions.find(p => p.id === selectedPlayer);
+      if (!player) return;
 
-    // Check if movement is on cooldown
-    if (player.movementCooldown && Date.now() - player.movementCooldown < 6000) {
-      // Could add a visual/audio feedback here that movement is on cooldown
-      return;
-    }
-    
-    let newPosition = { x: player.x, y: player.y };
-    let moved = false;
-    
-    switch(e.key) {
-      case 'ArrowUp':
-        if (player.y > 0) {
-          newPosition.y--;
-          moved = true;
-        }
-        break;
-      case 'ArrowDown':
-        if (player.y < gridConfig.height - 1) {
-          newPosition.y++;
-          moved = true;
-        }
-        break;
-      case 'ArrowLeft':
-        if (player.x > 0) {
-          newPosition.x--;
-          moved = true;
-        }
-        break;
-      case 'ArrowRight':
-        if (player.x < gridConfig.width - 1) {
-          newPosition.x++;
-          moved = true;
-        }
-        break;
-      default:
+      // Check if movement is on cooldown
+      if (player.movementCooldown && Date.now() - player.movementCooldown < 6000) {
+        // Could add a visual/audio feedback here that movement is on cooldown
         return;
-    }
+      }
+      
+      let newPosition = { x: player.x, y: player.y };
+      let moved = false;
+      
+      switch(e.key) {
+        case 'ArrowUp':
+          if (player.y > 0) {
+            newPosition.y--;
+            moved = true;
+          }
+          break;
+        case 'ArrowDown':
+          if (player.y < gridConfig.height - 1) {
+            newPosition.y++;
+            moved = true;
+          }
+          break;
+        case 'ArrowLeft':
+          if (player.x > 0) {
+            newPosition.x--;
+            moved = true;
+          }
+          break;
+        case 'ArrowRight':
+          if (player.x < gridConfig.width - 1) {
+            newPosition.x++;
+            moved = true;
+          }
+          break;
+        default:
+          return;
+      }
+      
+      if (moved) {
+        socket.emit('playerMove', newPosition);
+      }
+    };
     
-    if (moved) {
-      socket.emit('playerMove', newPosition);
-    }
-  };
-  
-  window.addEventListener('keydown', handleKeyPress);
-  return () => window.removeEventListener('keydown', handleKeyPress);
-}, [selectedPlayer, playerPositions, gridConfig, socket, localPlayerId]);
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [selectedPlayer, playerPositions, gridConfig, socket, localPlayerId]);
 
   // Image handling functions
   const handleImageUpload = async (e, type, playerId = null) => {
@@ -247,55 +273,142 @@ useEffect(() => {
     }
   };
 
- const updateTokenConfig = (playerId, key, value) => {
-  if (playerId !== localPlayerId || !socket) return;
-  
-  console.log('Updating token config:', { key, value });
-  
-  if (key === 'speed') {
-    socket.emit('updatePlayerToken', { speed: value });
-  } else {
-    socket.emit('updatePlayerToken', { 
-      tokenConfig: { 
-        ...playerPositions.find(p => p.id === playerId)?.tokenConfig,
-        [key]: value 
-      } 
-    });
-  }
-};
-
-// Attack handlers
-const saveAttack = (attack) => {
-  if (!attack?.cells || attack.cells.length === 0) return;
-  setSavedAttacks(prev => [...prev, {
-    ...attack,
-    color: attack.color || 'red' // Ensure color is preserved
-  }]);
-};
-
-const launchAttack = (attack) => {
-  if (!socket) return;
-  
-  const validatedAttack = {
-    ...attack,
-    color: attack.color || 'red', // Ensure color is preserved
-    cells: attack.cells.map(cell => ({
-      x: parseInt(cell.x) || 0,
-      y: parseInt(cell.y) || 0,
-      phase: parseInt(cell.phase) || 0
-    }))
+  const updateTokenConfig = (playerId, key, value) => {
+    if (playerId !== localPlayerId || !socket) return;
+    
+    console.log('Updating token config:', { key, value });
+    
+    if (key === 'speed') {
+      socket.emit('updatePlayerToken', { speed: value });
+    } else {
+      socket.emit('updatePlayerToken', { 
+        tokenConfig: { 
+          ...playerPositions.find(p => p.id === playerId)?.tokenConfig,
+          [key]: value 
+        } 
+      });
+    }
   };
-  
-  socket.emit('launchAttack', validatedAttack);
-};
 
-if (!isConnected) {
-  return (
-    <div className="flex items-center justify-center h-screen">
-      <p className="text-xl">Connecting to server...</p>
-    </div>
-  );
-}
+  // Attack handlers
+  const saveAttack = (attack) => {
+    if (!attack?.cells || attack.cells.length === 0) return;
+    setSavedAttacks(prev => [...prev, attack]);
+  };
+
+  const launchAttack = (attack) => {
+    if (!socket) return;
+    
+    const validatedAttack = {
+      ...attack,
+      cells: attack.cells.map(cell => ({
+        x: parseInt(cell.x) || 0,
+        y: parseInt(cell.y) || 0,
+        phase: parseInt(cell.phase) || 0
+      }))
+    };
+    
+    socket.emit('launchAttack', validatedAttack);
+  };
+
+  // Handle hit detection
+  const handleHit = (playerId, attackId) => {
+    // Only register a hit once per attack
+    const hitKey = `${playerId}-${attackId}`;
+    
+    setHitTracker(prev => {
+      // If this specific player-attack combination is already tracked, don't duplicate
+      if (prev[hitKey]) return prev;
+      
+      // Create a new hit record
+      const newHitTracker = { ...prev };
+      newHitTracker[hitKey] = {
+        timestamp: Date.now(),
+        processed: false
+      };
+      
+      // Update player hit count on the server
+      if (socket && playerId) {
+        socket.emit('playerHit', { playerId });
+      }
+      
+      return newHitTracker;
+    });
+  };
+
+  // Debug function for attack visualization
+  const DebugAttackVisualizer = () => {
+    // Skip rendering if no attack or phases
+    if (!currentAttack?.phases || !Array.isArray(currentAttack.phases)) {
+      return <div className="text-sm text-gray-500">No attack pattern to visualize</div>;
+    }
+    
+    // Create a grid representation
+    const grid = Array(gridConfig.height).fill().map(() => 
+      Array(gridConfig.width).fill(null)
+    );
+    
+    // Fill in the grid with phase numbers
+    currentAttack.phases.forEach((phase, phaseIndex) => {
+      (phase || []).forEach(cell => {
+        if (cell && cell.x >= 0 && cell.x < gridConfig.width && 
+            cell.y >= 0 && cell.y < gridConfig.height) {
+          grid[cell.y][cell.x] = phaseIndex;
+        }
+      });
+    });
+    
+    return (
+      <div className="mt-4 border rounded p-4">
+        <h3 className="font-bold mb-2">Attack Pattern Preview</h3>
+        <div 
+          className="grid gap-0 bg-gray-100" 
+          style={{
+            gridTemplateColumns: `repeat(${gridConfig.width}, 1fr)`,
+            width: 'fit-content'
+          }}
+        >
+          {grid.map((row, y) => 
+            row.map((cell, x) => (
+              <div 
+                key={`${x}-${y}`}
+                className={`w-5 h-5 border ${
+                  cell !== null 
+                    ? 'border-gray-800 font-bold' 
+                    : 'border-gray-200'
+                }`}
+                style={{
+                  backgroundColor: cell !== null
+                    ? `rgba(255, 0, 0, ${0.3 + (cell * 0.1)})`
+                    : 'transparent',
+                  color: cell !== null ? 'white' : 'transparent',
+                  fontSize: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                {cell !== null ? cell + 1 : ''}
+              </div>
+            ))
+          )}
+        </div>
+        
+        <div className="mt-2 text-xs text-gray-600">
+          Numbers indicate phase order (1, 2, 3...)
+        </div>
+      </div>
+    );
+  };
+
+  if (!isConnected) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-xl">Connecting to server...</p>
+      </div>
+    );
+  }
+  
   return (
     <Card className="p-6 bg-gray-50">
       <div className="mb-4 space-y-4">
@@ -351,6 +464,7 @@ if (!isConnected) {
           attacks={attacks}
           currentAttack={currentAttack}
           setCurrentAttack={setCurrentAttack}
+          onHit={handleHit} // Pass the hit handler
         />
         
         <div className="flex flex-col gap-4">
@@ -368,7 +482,11 @@ if (!isConnected) {
             savedAttacks={savedAttacks}
             saveAttack={saveAttack}
             launchAttack={launchAttack}
+            socket={socket} // Pass socket for direct communication
           />
+          
+          {/* Add the debug visualizer */}
+          <DebugAttackVisualizer />
         </div>
       </div>
     </Card>
