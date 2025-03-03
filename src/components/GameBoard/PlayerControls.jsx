@@ -21,11 +21,6 @@ const PlayerControls = ({
     return () => clearInterval(interval);
   }, []);
 
-  console.log('PlayerControls render:', {
-    playerPositions,
-    localPlayerId
-  });
-
   return (
     <div className="border rounded p-4">
       <h3 className="font-bold mb-2">Players</h3>
@@ -36,14 +31,6 @@ const PlayerControls = ({
         const cooldownProgress = player.movementCooldown 
           ? Math.max(0, Math.min(100, ((6000 - (Date.now() - player.movementCooldown)) / 6000) * 100))
           : 0;
-
-        console.log('Player data for cooldown:', {
-          playerId: player.id,
-          isLocal: isLocalPlayer,
-          cooldown: player.movementCooldown,
-          points: player.movementPoints,
-          cooldownProgress
-        });
 
         return (
           <div key={player.id} className="border-b last:border-0 py-2">
@@ -68,6 +55,13 @@ const PlayerControls = ({
               <span className="flex-grow">
                 {isLocalPlayer ? 'You' : `Player ${player.id.slice(0, 4)}`}
               </span>
+              
+              {/* Add hit counter display */}
+              {(player.hitCount > 0) && (
+                <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-bold">
+                  Hits: {player.hitCount}
+                </span>
+              )}
               
               {isLocalPlayer && (
                 <div className="flex gap-2">
