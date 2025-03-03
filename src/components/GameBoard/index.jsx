@@ -6,6 +6,7 @@ import PlayerControls from './PlayerControls';
 import AttackPatterns from './AttackPatterns';
 import { useSocket } from '../../context/SocketContext';
 import { CELL_SIZE, INITIAL_BACKGROUND_CONFIG, GRID_LIMITS } from './types';
+import ActiveAttacksDebug from './ActiveAttacksDebug';
 
 const GameBoard = () => {
   const { socket, isConnected } = useSocket();
@@ -99,29 +100,9 @@ const GameBoard = () => {
       setPlayerPositions(players);
     });
 
-  // Listen for new attacks
+// Listen for new attacks
 socket.on('newAttack', (attack) => {
   console.log('Received new attack from server:', attack);
-  
-  // Validate the attack data before processing
-  if (!attack || !attack.cells || !Array.isArray(attack.cells) || !attack.startTime) {
-    console.error('Invalid attack data received:', attack);
-    return;
-  }
-  
-  // Verify cells are valid
-  const validCells = attack.cells.every(cell => 
-    cell && typeof cell.x === 'number' && typeof cell.y === 'number'
-  );
-  
-  if (!validCells) {
-    console.error('Attack contains invalid cells:', attack.cells);
-    return;
-  }
-  
-  console.log(`Attack ${attack.id} has ${attack.cells.length} cells, max phase: ${
-    Math.max(...attack.cells.map(c => c.phase || 0))
-  }`);
   
   // Add attack to state, preventing duplicates
   setAttacks(prev => {
