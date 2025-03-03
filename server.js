@@ -245,46 +245,66 @@ app.prepare().then(() => {
     });
 
     // Updated launchAttack handler
-    socket.on('launchAttack', (attack) => {
-      console.log('Launching attack:', attack);
-      
-      // Validate attack data
-      if (!attack?.cells || !Array.isArray(attack.cells)) {
-        console.error('Invalid attack data received');
-        return;
-      }
+ socket.on('launchAttack', (attack) => {
+  console.log('Launching attack:', attack);
+  
+  // Validate attack data
+  if (!attack?.cells || !Array.isArray(attack.cells) || attack.cells.length === 0) {
+    console.error('Invalid attack data received for launch');
+    return;
+  }
 
-      // Ensure all cells have required properties
-      const validatedCells = attack.cells.map(cell => ({
-        x: parseInt(cell.x) || 0,
-        y: parseInt(cell.y) || 0,
-        phase: parseInt(cell.phase) || 0
-      }));
+  // Ensure all cells have required properties and are numbers
+  const validatedCells = attack.cells.filter(cell => 
+    cell && typeof cell.x !== 'undefined' && typeof cell.y !== 'undefined'
+  ).map(cell => ({
+    x: Number(cell.x),
+    y: Number(cell.y),
+    phase: Number(cell.phase || 0)
+  }));
 
-      const attackWithId = {
-        ...attack,
-        id: Date.now(),
-        startTime: Date.now(),
-        createdBy: socket.id,
-        cells: validatedCells
-      };
+  if (validatedCells.length === 0) {
+    console.error('No valid cells in attack data for launch');
+    return;
+  }
 
-      // Add to active attacks
-      gameState.activeAttacks.push(attackWithId);
-      
-      // Send to all clients
-      io.emit('newAttack', attackWithId);
+  // Create the attack object with current timestamp
+  const now = Date.now();
+  const attackWithId = {
+    ...attack,
+    id: now,
+    startTime: now,
+    createdBy: socket.id,
+    cells: validatedCells
+  };
 
-      // Calculate total duration including all phases
-      const maxPhase = Math.max(...validatedCells.map(cell => cell.phase));
-      const totalDuration = (maxPhase + 1) * 800 + 1500; // 800ms per phase + 1500ms for warning+active
+  // Detailed debug
+  console.log(`Launching attack ${attackWithId.id} with ${validatedCells.length} cells`);
+  console.log(`First 3 cells:`, validatedCells.slice(0, 3));
+  console.log(`Max phase:`, Math.max(...validatedCells.map(c => c.phase || 0)));
 
-      // Remove attack after completion
-      setTimeout(() => {
-        gameState.activeAttacks = gameState.activeAttacks.filter(a => a.id !== attackWithId.id);
-        io.emit('attackComplete', attackWithId.id);
-      }, totalDuration);
-    });
+  // Add to active attacks
+  gameState.activeAttacks.push(attackWithId);
+  
+  // Log active attacks
+  console.log(`Active attacks: ${gameState.activeAttacks.length}`);
+  
+  // Send to all clients
+  io.emit('newAttack', attackWithId);
+
+  // Calculate total duration including all phases
+  const maxPhase = Math.max(...validatedCells.map(cell => cell.phase || 0));
+  const totalDuration = (maxPhase + 1) * 800 + 1500; // 800ms per phase + 1500ms for warning+active
+
+  console.log(`Attack ${attackWithId.id} will last for ${totalDuration}ms (max phase: ${maxPhase})`);
+
+  // Remove attack after completion
+  setTimeout(() => {
+    gameState.activeAttacks = gameState.activeAttacks.filter(a => a.id !== attackWithId.id);
+    console.log(`Attack ${attackWithId.id} completed and removed. Remaining active attacks: ${gameState.activeAttacks.length}`);
+    io.emit('attackComplete', attackWithId.id);
+  }, totalDuration);
+});
 
     // Add handler for player hits
     socket.on('playerHit', (data) => {
