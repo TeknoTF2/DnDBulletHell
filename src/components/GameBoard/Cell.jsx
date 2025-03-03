@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { CELL_SIZE, TOKEN_SHAPES } from './types';
 
 const Cell = ({ 
@@ -10,9 +10,13 @@ const Cell = ({
   localPlayerId,
   attacks = [],
   currentAttack,
-  setCurrentAttack
+  setCurrentAttack,
+  onHit // New prop for handling hits
 }) => {
   const player = playerPositions?.find(p => p.x === x && p.y === y);
+  
+  // Keep track of hits to prevent duplicates
+  const hitTrackerRef = useRef(new Set());
   
   // Calculate attack state for this cell
   const getAttackState = () => {
@@ -39,6 +43,21 @@ const Cell = ({
         }
         // Active phase (next 1000ms)
         else if (timeInPhase <= 1500) {
+          // Hit detection - if there's a player on this cell during active phase
+          if (player && onHit) {
+            const hitKey = `${player.id}-${attack.id}-${cell.phase}`;
+            
+            // Only register hit once per player-attack-phase
+            if (!hitTrackerRef.current.has(hitKey)) {
+              hitTrackerRef.current.add(hitKey);
+              onHit(player.id, attack.id);
+              
+              // Clean up old hits after some time
+              setTimeout(() => {
+                hitTrackerRef.current.delete(hitKey);
+              }, 5000);
+            }
+          }
           return 'active';
         }
       }
