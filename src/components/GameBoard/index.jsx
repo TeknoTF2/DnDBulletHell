@@ -99,57 +99,85 @@ const GameBoard = () => {
       setPlayerPositions(players);
     });
 
-    // Listen for new attacks
-    socket.on('newAttack', (attack) => {
-      console.log('Received new attack:', attack);
-      setAttacks(prev => [...prev, attack]);
-    });
+  // Listen for new attacks
+socket.on('newAttack', (attack) => {
+  console.log('Received new attack from server:', attack);
+  
+  // Validate the attack data before processing
+  if (!attack || !attack.cells || !Array.isArray(attack.cells) || !attack.startTime) {
+    console.error('Invalid attack data received:', attack);
+    return;
+  }
+  
+  // Verify cells are valid
+  const validCells = attack.cells.every(cell => 
+    cell && typeof cell.x === 'number' && typeof cell.y === 'number'
+  );
+  
+  if (!validCells) {
+    console.error('Attack contains invalid cells:', attack.cells);
+    return;
+  }
+  
+  console.log(`Attack ${attack.id} has ${attack.cells.length} cells, max phase: ${
+    Math.max(...attack.cells.map(c => c.phase || 0))
+  }`);
+  
+  // Add attack to state, preventing duplicates
+  setAttacks(prev => {
+    // Check for duplicates
+    const exists = prev.some(a => a.id === attack.id);
+    if (exists) {
+      return prev;
+    }
+    return [...prev, attack];
+  });
+});
 
-    // Listen for attack completion
-    socket.on('attackComplete', (attackId) => {
-      console.log('Attack completed:', attackId);
-      setAttacks(prev => prev.filter(a => a.id !== attackId));
-    });
+// Listen for attack completion
+socket.on('attackComplete', (attackId) => {
+  console.log('Attack completed, removing ID:', attackId);
+  setAttacks(prev => prev.filter(a => a.id !== attackId));
+});
 
-    // Listen for player hits
-    socket.on('playerHit', (data) => {
-      console.log('Player hit:', data);
-      setPlayerPositions(prev => 
-        prev.map(player => 
-          player.id === data.playerId 
-            ? { ...player, hitCount: data.hitCount } 
-            : player
-        )
-      );
-    });
+// Listen for player hits
+socket.on('playerHit', (data) => {
+  console.log('Player hit:', data);
+  setPlayerPositions(prev => 
+    prev.map(player => 
+      player.id === data.playerId 
+        ? { ...player, hitCount: data.hitCount } 
+        : player
+    )
+  );
+});
 
-    // Listen for saved attacks updates
-    socket.on('savedAttacksUpdate', (attacks) => {
-      console.log('Received saved attacks:', attacks);
-      setSavedAttacks(attacks);
-    });
+// Listen for saved attacks updates
+socket.on('savedAttacksUpdate', (attacks) => {
+  console.log('Received saved attacks:', attacks);
+  setSavedAttacks(attacks);
+});
 
-    // Listen for board configuration updates
-    socket.on('boardConfigUpdate', (config) => {
-      setGridConfig(config.grid);
-      if (config.background.image) {
-        setBackgroundImage(config.background.image);
-      }
-      setBackgroundConfig(config.background.config);
-    });
+// Listen for board configuration updates
+socket.on('boardConfigUpdate', (config) => {
+  setGridConfig(config.grid);
+  if (config.background.image) {
+    setBackgroundImage(config.background.image);
+  }
+  setBackgroundConfig(config.background.config);
+});
 
-    // Request current saved attacks on connection
-    socket.emit('getSavedAttacks');
+// Request current saved attacks on connection
+socket.emit('getSavedAttacks');
 
-    return () => {
-      socket.off('playersUpdate');
-      socket.off('newAttack');
-      socket.off('attackComplete');
-      socket.off('playerHit');
-      socket.off('savedAttacksUpdate');
-      socket.off('boardConfigUpdate');
-    };
-  }, [socket, isConnected]);
+return () => {
+  socket.off('playersUpdate');
+  socket.off('newAttack');
+  socket.off('attackComplete');
+  socket.off('playerHit');
+  socket.off('savedAttacksUpdate');
+  socket.off('boardConfigUpdate');
+};
 
   // Handle player movement
   useEffect(() => {
