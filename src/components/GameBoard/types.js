@@ -26,3 +26,6 @@ export const GRID_LIMITS = {
   min: 5,
   max: 30
 };
+
+// New constants for attack system
+export const ATTACK_HIT_TIMEOUT = 5000; // Time in ms that a hit counter remains visible (5 seconds)
