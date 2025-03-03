@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Plus } from 'lucide-react';
 
 const AttackPatterns = ({
@@ -6,8 +6,17 @@ const AttackPatterns = ({
   setCurrentAttack,
   savedAttacks = [],
   saveAttack,
-  launchAttack
+  launchAttack,
+  socket // New prop for socket access
 }) => {
+  // Fetch saved attacks on component mount
+  useEffect(() => {
+    if (socket) {
+      // Request saved attacks from the server
+      socket.emit('getSavedAttacks');
+    }
+  }, [socket]);
+
   const addPhase = () => {
     setCurrentAttack(prev => ({
       ...prev,
@@ -51,8 +60,19 @@ const AttackPatterns = ({
       cells: cells
     };
 
-    // Save the attack
+    console.group('Saving Attack Pattern');
+    console.log('Current attack structure:', currentAttack);
+    console.log('Converted cells:', cells);
+    console.log('Final attack to save:', attackToSave);
+    console.groupEnd();
+
+    // Save the attack locally
     saveAttack(attackToSave);
+    
+    // Also send to server for persistent storage
+    if (socket) {
+      socket.emit('saveAttack', attackToSave);
+    }
 
     // Reset current attack
     setCurrentAttack({
@@ -69,6 +89,10 @@ const AttackPatterns = ({
       return;
     }
 
+    console.group('Launching Attack');
+    console.log('Original attack:', attack);
+    console.groupEnd();
+
     // Make sure all cells have the required properties
     const validatedAttack = {
       ...attack,
@@ -79,7 +103,15 @@ const AttackPatterns = ({
       }))
     };
 
+    // Launch the attack
     launchAttack(validatedAttack);
+  };
+
+  const getCellsInCurrentPhase = () => {
+    if (!currentAttack?.phases?.[currentAttack.currentPhase]) {
+      return 0;
+    }
+    return currentAttack.phases[currentAttack.currentPhase].length;
   };
 
   return (
@@ -121,6 +153,15 @@ const AttackPatterns = ({
               </button>
             ))}
           </div>
+          
+          <div className="mt-2 text-sm text-gray-600">
+            Current phase: {currentAttack.currentPhase + 1} 
+            ({getCellsInCurrentPhase()} cells selected)
+          </div>
+          
+          <div className="mt-2 text-sm text-gray-600">
+            Total cells: {currentAttack.phases.reduce((sum, phase) => sum + (phase?.length || 0), 0)}
+          </div>
         </div>
 
         <button
@@ -138,7 +179,7 @@ const AttackPatterns = ({
         ) : (
           <div className="flex flex-col gap-2">
             {savedAttacks.map(attack => (
-              <div key={attack.id} className="flex justify-between items-center">
+              <div key={attack.id} className="flex justify-between items-center p-2 hover:bg-gray-50">
                 <span>
                   {attack.name || 'Unnamed Attack'}
                   <span className="text-sm text-gray-500 ml-2">
