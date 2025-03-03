@@ -12,7 +12,8 @@ const Grid = ({
   localPlayerId,
   attacks,
   currentAttack,
-  setCurrentAttack
+  setCurrentAttack,
+  onHit // New prop for hit detection
 }) => {
   return (
     <div>
@@ -39,6 +40,7 @@ const Grid = ({
             attacks={attacks}
             currentAttack={currentAttack}
             setCurrentAttack={setCurrentAttack}
+            onHit={onHit} // Pass the hit handler
           />
         ))}
       </div>
