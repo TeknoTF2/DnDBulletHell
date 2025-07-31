@@ -159,6 +159,7 @@ return () => {
 socket.off('savedAttacksUpdate');
 socket.off('boardConfigUpdate');
 };
+  }, [socket, isConnected]);
 
   }, [socket, isConnected]);
 
@@ -475,8 +476,8 @@ socket.off('boardConfigUpdate');
           attacks={attacks}
           currentAttack={currentAttack}
           setCurrentAttack={setCurrentAttack}
-          onHit={handleHit} // Pass the hit handler
-        />
+          onHit={handleHit}
+          />
         
         <div className="flex flex-col gap-4">
           <PlayerControls
@@ -493,8 +494,8 @@ socket.off('boardConfigUpdate');
             savedAttacks={savedAttacks}
             saveAttack={saveAttack}
             launchAttack={launchAttack}
-            socket={socket} // Pass socket for direct communication
-          />
+              socket={socket}
+            />
           
           {/* Add the debug visualizer */}
           <DebugAttackVisualizer />
