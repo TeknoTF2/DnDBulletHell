@@ -156,9 +156,11 @@ return () => {
   socket.off('newAttack');
   socket.off('attackComplete');
   socket.off('playerHit');
-  socket.off('savedAttacksUpdate');
-  socket.off('boardConfigUpdate');
+socket.off('savedAttacksUpdate');
+socket.off('boardConfigUpdate');
 };
+
+  }, [socket, isConnected]);
 
   // Handle player movement
   useEffect(() => {
