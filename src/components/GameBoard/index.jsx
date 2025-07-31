@@ -159,6 +159,7 @@ return () => {
   socket.off('savedAttacksUpdate');
   socket.off('boardConfigUpdate');
 };
+  }, [socket, isConnected]);
 
   // Handle player movement
   useEffect(() => {
@@ -473,8 +474,8 @@ return () => {
           attacks={attacks}
           currentAttack={currentAttack}
           setCurrentAttack={setCurrentAttack}
-          onHit={handleHit} // Pass the hit handler
-        />
+          onHit={handleHit}
+          />
         
         <div className="flex flex-col gap-4">
           <PlayerControls
@@ -491,8 +492,8 @@ return () => {
             savedAttacks={savedAttacks}
             saveAttack={saveAttack}
             launchAttack={launchAttack}
-            socket={socket} // Pass socket for direct communication
-          />
+              socket={socket}
+            />
           
           {/* Add the debug visualizer */}
           <DebugAttackVisualizer />
