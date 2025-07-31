@@ -161,7 +161,6 @@ socket.off('boardConfigUpdate');
 };
   }, [socket, isConnected]);
 
-  }, [socket, isConnected]);
 
   // Handle player movement
   useEffect(() => {
