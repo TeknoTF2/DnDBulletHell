@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Cell from './Cell';
 import { CELL_SIZE } from './types';
 
-const Grid = ({ 
+const Grid = ({
   gridConfig,
   backgroundImage,
   backgroundConfig,
@@ -15,10 +15,19 @@ const Grid = ({
   setCurrentAttack,
   onHit // New prop for hit detection
 }) => {
+  // Force periodic re-renders so attack animations progress
+  const [, setRefresh] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefresh(r => r + 1);
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div>
-      <div 
-        className="grid gap-0 mb-4 relative" 
+      <div
+        className="grid gap-0 mb-4 relative"
         style={{ 
           width: CELL_SIZE * gridConfig.width,
           gridTemplateColumns: `repeat(${gridConfig.width}, ${CELL_SIZE}px)`,
